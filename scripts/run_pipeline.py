@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+import os
+import sys
+
+# Add the parent directory (project root) to the Python path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from src.api.leagues import LeaguesAPI
 from src.data.processors import process_leagues_data
 from src.data.exporters import export_to_csv

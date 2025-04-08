@@ -19,8 +19,10 @@ class APIClient:
                     url, 
                     headers=self.headers, 
                     params=params,
-                    timeout=REQUEST_TIMEOUT
+                    timeout=REQUEST_TIMEOUT,
+                    verify=False
                 )
+                requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
                 response.raise_for_status()
                 return response.json()
                 
