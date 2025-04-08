@@ -7,6 +7,11 @@ load_dotenv()
 
 # API configuration
 API_KEY = os.getenv("SPORTMONKS_API_KEY")
+if not API_KEY:
+    raise ValueError("Missing API key! Make sure SPORTMONKS_API_KEY is set in your .env file")
+
+# Base URL for the SportMonks Football API v3
+# Make sure this URL is correctly structured
 API_BASE_URL = "https://api.sportmonks.com/v3/football"
 
 # Data directories
@@ -30,3 +35,8 @@ LEAGUES_PROCESSED_DIR.mkdir(exist_ok=True)
 REQUEST_TIMEOUT = 30  # seconds
 MAX_RETRIES = 3
 RETRY_BACKOFF_FACTOR = 2
+
+# Print configuration for debugging
+print(f"Using API base URL: {API_BASE_URL}")
+print(f"API key is {'set' if API_KEY else 'NOT SET'}")
+print(f"Data will be saved to: {DATA_DIR}")

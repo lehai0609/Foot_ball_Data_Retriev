@@ -8,7 +8,7 @@ class LeaguesAPI:
     
     def __init__(self):
         self.client = APIClient()
-        self.endpoint = "leagues"
+        self.endpoint = "leagues"  # This is correct as the base endpoint
     
     def get_all_leagues(self, include="country", per_page=100):
         """
@@ -28,34 +28,47 @@ class LeaguesAPI:
         print("Downloading leagues data...")
         
         while page <= total_pages:
+            # The SportMonks API v3 expects parameters with no question mark prefix
+            # The include parameter should be formatted properly
             params = {
                 "include": include,
                 "per_page": per_page,
                 "page": page
             }
             
-            data = self.client.get(self.endpoint, params)
+            try:
+                data = self.client.get(self.endpoint, params)
+                
+                # Update total pages from first response
+                if page == 1:
+                    total_pages = data.get("pagination", {}).get("total_pages", 1)
+                    print(f"Found {data.get('pagination', {}).get('total', 0)} leagues across {total_pages} pages")
+                
+                # Extract leagues data
+                leagues = data.get("data", [])
+                all_leagues.extend(leagues)
+                
+                print(f"Downloaded page {page}/{total_pages}")
+                
+                # Save raw data for each page
+                self._save_page(page, data)
+                
+                page += 1
             
-            # Update total pages from first response
-            if page == 1:
-                total_pages = data.get("pagination", {}).get("total_pages", 1)
-                print(f"Found {data.get('pagination', {}).get('total', 0)} leagues across {total_pages} pages")
-            
-            # Extract leagues data
-            leagues = data.get("data", [])
-            all_leagues.extend(leagues)
-            
-            print(f"Downloaded page {page}/{total_pages}")
-            
-            # Save raw data for each page
-            self._save_page(page, data)
-            
-            page += 1
+            except Exception as e:
+                print(f"Error downloading page {page}: {str(e)}")
+                # Provide more detailed debugging info
+                print(f"Endpoint: {self.endpoint}, Parameters: {params}")
+                # If we fail, still try to save what we've got so far
+                break
         
-        # Save all leagues to a single file
-        self._save_all(all_leagues)
+        # Save all leagues to a single file if we got any data
+        if all_leagues:
+            self._save_all(all_leagues)
+            print(f"Downloaded {len(all_leagues)} leagues successfully.")
+        else:
+            print("No leagues data was downloaded.")
         
-        print(f"Downloaded {len(all_leagues)} leagues successfully.")
         return all_leagues
     
     def _save_page(self, page, data):
