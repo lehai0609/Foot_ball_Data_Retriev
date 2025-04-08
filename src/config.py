@@ -10,9 +10,9 @@ API_KEY = os.getenv("SPORTMONKS_API_KEY")
 if not API_KEY:
     raise ValueError("Missing API key! Make sure SPORTMONKS_API_KEY is set in your .env file")
 
-# Base URL for the SportMonks Football API v3
-# Make sure this URL is correctly structured
-API_BASE_URL = "https://api.sportmonks.com/v3/football"
+# Base URL for the SportMonks API
+# Updated to match official documentation structure
+API_BASE_URL = "https://api.sportmonks.com"
 
 # Data directories
 BASE_DIR = Path(__file__).parent.parent

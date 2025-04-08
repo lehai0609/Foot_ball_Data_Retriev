@@ -8,7 +8,8 @@ class LeaguesAPI:
     
     def __init__(self):
         self.client = APIClient()
-        self.endpoint = "leagues"  # This is correct as the base endpoint
+        # Updated endpoint to match official API structure
+        self.endpoint = "api/v3/football/leagues"
     
     def get_all_leagues(self, include="country", per_page=100):
         """
@@ -28,8 +29,7 @@ class LeaguesAPI:
         print("Downloading leagues data...")
         
         while page <= total_pages:
-            # The SportMonks API v3 expects parameters with no question mark prefix
-            # The include parameter should be formatted properly
+            # Parameters formatted according to SportMonks API requirements
             params = {
                 "include": include,
                 "per_page": per_page,
@@ -41,6 +41,13 @@ class LeaguesAPI:
                 
                 # Update total pages from first response
                 if page == 1:
+                    # Check for unexpected response format
+                    if "pagination" not in data:
+                        print(f"Warning: Unexpected API response format. Missing 'pagination'.")
+                        print(f"Response preview: {str(data)[:200]}...")
+                        # Could implement fallback strategy here if needed
+                        break
+                        
                     total_pages = data.get("pagination", {}).get("total_pages", 1)
                     print(f"Found {data.get('pagination', {}).get('total', 0)} leagues across {total_pages} pages")
                 
@@ -57,7 +64,6 @@ class LeaguesAPI:
             
             except Exception as e:
                 print(f"Error downloading page {page}: {str(e)}")
-                # Provide more detailed debugging info
                 print(f"Endpoint: {self.endpoint}, Parameters: {params}")
                 # If we fail, still try to save what we've got so far
                 break

@@ -9,17 +9,19 @@ class APIClient:
     def __init__(self):
         self.base_url = API_BASE_URL
         self.headers = {
-            "Authorization": f"Bearer {API_KEY}",
-            "Accept": "application/json"  # Explicitly set Accept header
+            "Accept": "application/json"  # Only keep the Accept header
         }
     
     def get(self, endpoint, params=None):
         """Make a GET request to the API with retry logic."""
         url = f"{self.base_url}/{endpoint}"
         
-        # Disable SSL warnings if verify=False is used
-        if not API_BASE_URL.startswith("https"):
-            requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
+        # Initialize params if None
+        if params is None:
+            params = {}
+        
+        # Add API token to parameters instead of using headers (per SportMonks docs)
+        params["api_token"] = API_KEY
         
         for attempt in range(MAX_RETRIES):
             try:
@@ -31,7 +33,7 @@ class APIClient:
                     headers=self.headers, 
                     params=params,
                     timeout=REQUEST_TIMEOUT,
-                    verify=False  # Changed to True for security
+                    verify=True  # Enable SSL verification
                 )
                 
                 # Log the response status
