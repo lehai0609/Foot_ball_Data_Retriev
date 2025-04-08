@@ -8,8 +8,8 @@ class LeaguesAPI:
     
     def __init__(self):
         self.client = APIClient()
-        # Updated endpoint to match official API structure
-        self.endpoint = "api/v3/football/leagues"
+        # Fixed endpoint to match official API structure - removed extra "api/" segment
+        self.endpoint = "v3/football/leagues"
     
     def get_all_leagues(self, include="country", per_page=100):
         """

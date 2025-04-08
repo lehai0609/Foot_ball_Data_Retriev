@@ -27,22 +27,33 @@ def process_leagues_data():
     # Extract required fields
     leagues_table = []
     for league in leagues_data:
+        # Updated to match the actual API response structure from documentation
         league_info = {
             "id": league.get("id"),
             "name": league.get("name"),
-            "short_code": league.get("code"),
-            "country_id": None
+            "short_code": league.get("short_code"),
+            "country_id": league.get("country_id"),  # Get country_id directly from the league object
+            "sport_id": league.get("sport_id"),
+            "active": league.get("active"),
+            "type": league.get("type"),
+            "sub_type": league.get("sub_type"),
+            "last_played_at": league.get("last_played_at"),
+            "category": league.get("category")
         }
-        
-        # Extract country_id from the relationships if available
-        if "country" in league.get("relationships", {}):
-            country_data = league.get("relationships", {}).get("country", {}).get("data")
-            if country_data:
-                league_info["country_id"] = country_data.get("id")
         
         leagues_table.append(league_info)
     
     # Convert to pandas DataFrame
     df = pd.DataFrame(leagues_table)
+    
+    # Print summary of data loaded
+    print(f"Processed {len(df)} leagues")
+    if not df.empty:
+        print(f"Columns in dataset: {', '.join(df.columns.tolist())}")
+        print(f"Missing values check:")
+        for col in df.columns:
+            null_count = df[col].isna().sum()
+            if null_count > 0:
+                print(f"  - {col}: {null_count} missing values")
     
     return df

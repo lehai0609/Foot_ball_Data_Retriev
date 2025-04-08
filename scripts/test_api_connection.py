@@ -60,11 +60,14 @@ def test_api_connection():
                 league = data["data"][0]
                 print(f"- ID: {league.get('id')}")
                 print(f"- Name: {league.get('name')}")
-                print(f"- Short code: {league.get('code', 'N/A')}")
+                print(f"- Short code: {league.get('short_code', 'N/A')}")
+                print(f"- Country ID: {league.get('country_id', 'N/A')}")
+                print(f"- Sport ID: {league.get('sport_id', 'N/A')}")
                 
-                # Check for relationships
-                if "relationships" in league:
-                    print(f"- Available relationships: {', '.join(league['relationships'].keys())}")
+                # Print all available fields for reference
+                print("\nAll fields in league object:")
+                for key, value in league.items():
+                    print(f"- {key}: {value}")
         else:
             print("❌ Connection failed!")
             try:
