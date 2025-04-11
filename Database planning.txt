@@ -1,0 +1,199 @@
+## Suggested SQLite code
+-- Leagues table
+CREATE TABLE leagues (
+    league_id INTEGER PRIMARY KEY,  -- From SportMonks API
+    name TEXT NOT NULL,
+    country_id INTEGER,
+    country_name TEXT,
+    is_active BOOLEAN DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Teams table
+CREATE TABLE teams (
+    team_id INTEGER PRIMARY KEY,  -- From SportMonks API
+    name TEXT NOT NULL,
+    short_name TEXT,
+    country_id INTEGER,
+    country_name TEXT,
+    logo_url TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Seasons table
+CREATE TABLE seasons (
+    season_id INTEGER PRIMARY KEY,  -- From SportMonks API
+    league_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    start_date DATE,
+    end_date DATE,
+    is_current BOOLEAN DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (league_id) REFERENCES leagues(league_id)
+);
+
+-- Fixtures table (central table)
+CREATE TABLE fixtures (
+    fixture_id INTEGER PRIMARY KEY,  -- From SportMonks API
+    season_id INTEGER NOT NULL,
+    league_id INTEGER NOT NULL,
+    home_team_id INTEGER NOT NULL,
+    away_team_id INTEGER NOT NULL,
+    start_time DATETIME NOT NULL,
+    status TEXT,  -- scheduled, in_play, finished
+    result TEXT,  -- home_win, away_win, draw
+    home_score INTEGER DEFAULT 0,
+    away_score INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (season_id) REFERENCES seasons(season_id),
+    FOREIGN KEY (league_id) REFERENCES leagues(league_id),
+    FOREIGN KEY (home_team_id) REFERENCES teams(team_id),
+    FOREIGN KEY (away_team_id) REFERENCES teams(team_id)
+);
+
+-- Pre-match and In-play odds
+CREATE TABLE fixture_odds (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fixture_id INTEGER NOT NULL,
+    bookmaker_id INTEGER,
+    bookmaker_name TEXT,
+    market_type TEXT NOT NULL,  -- 1x2, over_under, etc.
+    timestamp DATETIME NOT NULL,
+    stage TEXT NOT NULL,  -- pre_match, in_play
+    home_odds REAL,
+    draw_odds REAL,
+    away_odds REAL,
+    over_under_value REAL,  -- e.g., 2.5 goals
+    over_odds REAL,
+    under_odds REAL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (fixture_id) REFERENCES fixtures(fixture_id)
+);
+
+-- Match statistics
+CREATE TABLE fixture_stats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fixture_id INTEGER NOT NULL,
+    team_id INTEGER NOT NULL,
+    period TEXT NOT NULL,  -- first_half, full_match
+    goals INTEGER DEFAULT 0,
+    shots_on_target INTEGER DEFAULT 0,
+    shots_off_target INTEGER DEFAULT 0,
+    possession REAL,  -- percentage (0-100)
+    corners INTEGER DEFAULT 0,
+    fouls INTEGER DEFAULT 0,
+    yellow_cards INTEGER DEFAULT 0,
+    red_cards INTEGER DEFAULT 0,
+    timestamp DATETIME NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (fixture_id) REFERENCES fixtures(fixture_id),
+    FOREIGN KEY (team_id) REFERENCES teams(team_id)
+);
+
+-- Minute-by-minute timeline data
+CREATE TABLE fixture_timeline (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fixture_id INTEGER NOT NULL,
+    minute INTEGER NOT NULL,
+    ball_x REAL,  -- x coordinate
+    ball_y REAL,  -- y coordinate
+    home_pressure_index REAL,
+    away_pressure_index REAL,
+    timestamp DATETIME NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (fixture_id) REFERENCES fixtures(fixture_id)
+);
+
+-- Create indexes for better query performance
+CREATE INDEX idx_fixtures_league ON fixtures(league_id, start_time);
+CREATE INDEX idx_fixtures_teams ON fixtures(home_team_id, away_team_id);
+CREATE INDEX idx_fixture_odds ON fixture_odds(fixture_id, bookmaker_id, market_type, timestamp);
+CREATE INDEX idx_fixture_stats ON fixture_stats(fixture_id, team_id, period);
+CREATE INDEX idx_fixture_timeline ON fixture_timeline(fixture_id, minute);
+
+## Table explain
+
+
+### leagues
+
+This table stores basic information about football leagues (Premier League, La Liga, etc.). It's a foundational table that other tables will reference.
+
+### teams
+
+Stores information about the football clubs participating in the leagues. Both home and away teams in fixtures will reference this table.
+
+### seasons
+
+Each league has multiple seasons (2022/2023, 2023/2024, etc.). This table helps organize fixtures by their respective seasons.
+
+### fixtures (central table)
+
+This is the core table that represents individual matches. It connects to leagues, seasons, and teams, and stores basic match information like scores and status.
+
+### fixture_odds
+
+Stores both pre-match and in-play odds from various bookmakers. The `stage` field distinguishes between pre-match and in-play odds, while `market_type` identifies different betting markets (1X2, over/under, etc.).
+
+### fixture_stats
+
+Captures match statistics for each team, separated by period (first half or full match). This design makes it easy to compare first-half stats with full-match stats.
+
+### fixture_timeline
+
+Stores minute-by-minute data like ball coordinates and pressure indices. This granular data will be valuable for your prediction model.
+
+## How to use this Schema for Prediction modelling
+
+### Prematch prediction
+
+```sql
+-- Example query to gather pre-match features
+SELECT f.fixture_id, f.home_team_id, f.away_team_id,
+       ho.home_odds, ho.draw_odds, ho.away_odds,
+       -- Add historical team performance metrics
+FROM fixtures f
+JOIN fixture_odds ho ON f.fixture_id = ho.fixture_id
+WHERE ho.stage = 'pre_match'
+AND ho.market_type = '1x2' 
+-- Get the odds closest to kick-off
+AND ho.timestamp = (
+    SELECT MAX(timestamp) 
+    FROM fixture_odds 
+    WHERE fixture_id = f.fixture_id AND stage = 'pre_match'
+)
+```
+
+### In-play prediction 
+
+```sql
+-- Example query to gather pre-match features
+SELECT f.fixture_id, f.home_team_id, f.away_team_id,
+       ho.home_odds, ho.draw_odds, ho.away_odds,
+       -- Add historical team performance metrics
+FROM fixtures f
+JOIN fixture_odds ho ON f.fixture_id = ho.fixture_id
+WHERE ho.stage = 'pre_match'
+AND ho.market_type = '1x2' 
+-- Get the odds closest to kick-off
+AND ho.timestamp = (
+    SELECT MAX(timestamp) 
+    FROM fixture_odds 
+    WHERE fixture_id = f.fixture_id AND stage = 'pre_match'
+)
+```
+
+## Implementation suggestion
+
+- **Data Integration:**
+    - Use your existing `EndpointHandler` class to fetch data from various SportMonks endpoints
+    - Create a data processing module to transform API responses into the database schema format
+- **Schema Creation:**
+    - Add a file `src/data/schema.py` with the schema definitions
+    - Create a script to initialize the database with this schema
+- **Incremental Updates:**
+    - Design your data pipeline to only fetch and store new or updated data
+    - Use the `updated_at` fields to track changes
