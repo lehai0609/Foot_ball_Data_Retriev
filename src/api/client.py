@@ -9,7 +9,7 @@ class APIClient:
     def __init__(self):
         self.base_url = API_BASE_URL
         self.headers = {
-            "Accept": "application/json"  # Only keep the Accept header
+            "Accept": "application/json"
         }
     
     def get(self, endpoint, params=None):
@@ -20,7 +20,7 @@ class APIClient:
         if params is None:
             params = {}
         
-        # Add API token to parameters instead of using headers (per SportMonks docs)
+        # Add API token to parameters per SportMonks docs
         params["api_token"] = API_KEY
         
         for attempt in range(MAX_RETRIES):
@@ -33,7 +33,7 @@ class APIClient:
                     headers=self.headers, 
                     params=params,
                     timeout=REQUEST_TIMEOUT,
-                    verify=True  # Enable SSL verification
+                    verify=True
                 )
                 
                 # Log the response status
