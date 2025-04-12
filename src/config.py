@@ -31,6 +31,10 @@ LEAGUES_PROCESSED_DIR = PROCESSED_DATA_DIR / "leagues"
 LEAGUES_RAW_DIR.mkdir(exist_ok=True)
 LEAGUES_PROCESSED_DIR.mkdir(exist_ok=True)
 
+# Database Path
+DATABASE_PATH = DATA_DIR / "database" / "football_data.db"
+DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True) # Ensure directory exists
+
 # Request configuration
 REQUEST_TIMEOUT = 30  # seconds
 MAX_RETRIES = 3

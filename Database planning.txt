@@ -1,11 +1,18 @@
 ## Suggested SQLite code
 -- Leagues table
 CREATE TABLE leagues (
-    league_id INTEGER PRIMARY KEY,  -- From SportMonks API
-    name TEXT NOT NULL,
-    country_id INTEGER,
-    country_name TEXT,
-    is_active BOOLEAN DEFAULT 1,
+    league_id INTEGER PRIMARY KEY,          -- From SportMonks API 'id'
+    sport_id INTEGER,                       -- From SportMonks API 'sport_id'
+    country_id INTEGER,                     -- From SportMonks API 'country_id'
+    name TEXT NOT NULL,                     -- From SportMonks API 'name'
+    active BOOLEAN DEFAULT 1,               -- From SportMonks API 'active'
+    short_code TEXT,                        -- From SportMonks API 'short_code' (nullable)
+    image_path TEXT,                        -- From SportMonks API 'image_path' (nullable)
+    type TEXT,                              -- From SportMonks API 'type' (e.g., 'league', 'cup')
+    sub_type TEXT,                          -- From SportMonks API 'sub_type' (e.g., 'domestic', 'domestic_cup')
+    last_played_at TEXT,                    -- From SportMonks API 'last_played_at' (ISO format string, nullable)
+    category INTEGER,                       -- From SportMonks API 'category' (nullable)
+    -- Database internal tracking timestamps
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
