@@ -28,114 +28,33 @@ First, let's identify the exact Sportmonks API endpoints needed for your predict
 
 ## Phase 2: Implementation Steps
 
-### Step 1: Endpoint Handlers (3-4 days)
+### Step 1: Core Modules Setup (2-3 days)
+1.  Refine `src/api/client.py` and `src.api.endpoints.py` (`EndpointHandler`).
+2.  Set up `src/config.py`.
+3.  Implement core database connection and table creation logic in `src/data/storage.py`.
+4.  Define initial database schema in `Database planning.txt` and potentially a setup script or within `storage.py`. [cite: 11, 15, 16, 17, 19, 21, 23]
 
-1. Review existing `LeaguesAPI` class and `EndpointHandler` as templates
-2. Implement remaining endpoint handlers:
-    - `SeasonsAPI` - For fetching active seasons
-    - `TeamsAPI` - For team information
-    - `FixturesAPI` - For match data
-    - `OddsAPI` - For betting data
-    - `StatisticsAPI` - For match statistics
+### Step 2: Implement Sync Scripts (Iterative, 1-2 days per resource)
+For each required resource (Leagues, Seasons, Teams, Fixtures, Odds, Stats, etc.):
+1.  **Create Processing Function:** Add a specific `process_<resource>_data` function in `src/data/processors.py` to transform the raw API JSON for that resource into a list of dictionaries matching the database schema.
+2.  **Create Sync Script:** Create `scripts/sync_<resource>.py` (e.g., `sync_leagues.py`, `sync_seasons.py`).
+    * This script will use `EndpointHandler` to fetch all data for the resource's endpoint.
+    * It will call the corresponding `process_<resource>_data` function.
+    * It will call database functions from `src/data/storage.py` (like `create_<resource>_table` if needed, and `store_data`) to save the processed data into the correct SQLite table.
+3.  **Refine Database Schema/Storage:** Update `src/data/storage.py` with table creation logic for the new resource and adjust `store_data` if specific handling is needed. Update `Database planning.txt`.
 
-### Step 2: Data Acquisition Framework (2-3 days)
+### Step 3: Implement Supporting Logic (Ongoing)
+1.  **Error Handling:** Enhance error handling within sync scripts, processors, and storage functions.
+2.  **Logging:** Add proper logging throughout the process.
+3.  **Incremental Updates:** (Advanced) Modify sync scripts and storage logic to handle fetching/storing only new or updated records based on timestamps or API parameters, if feasible.
+4.  **Scheduling/Orchestration:** (Optional) Use OS tools (cron) or Python libraries (schedule) to run sync scripts automatically.
 
-1. Create a data acquisition scheduler:
-    
-    - Fetch league and season data (one-time/weekly)
-    - Fetch fixture schedule (daily)
-    - Fetch historical fixture details (batch process)
-    - Design incremental update logic
-2. Implement rate limiting and error handling:
-    
-    - Respect API limits
-    - Implement exponential backoff
-    - Log failures for retry
-
-### Step 3: Data Processing Layer (3-4 days)
-
-1. Create JSON-to-relational processors:
-    
-    - `LeagueProcessor` - Transform league data
-    - `TeamProcessor` - Transform team data
-    - `FixtureProcessor` - Transform fixture data
-    - `OddsProcessor` - Transform odds data to structured format
-    - `StatisticsProcessor` - Transform stats by period
-    - `TimelineProcessor` - Transform event timeline to minute-by-minute data
-2. Design data validation functions:
-    
-    - Field validation
-    - Relationship validation
-    - Data consistency checks
-
-### Step 4: Database Implementation (2-3 days)
-
-1. Finalize SQLite schema (build on provided design)
-2. Implement database creation script
-3. Create data storage service with functions for:
-    - Initial bulk loading
-    - Incremental updates
-    - Data deduplication logic
-    - Transaction handling
-
-### Step 5: Integration and Orchestration (3-4 days)
-
-1. Create main data pipeline script(s):
-    
-    - `download_core_data.py` - Fetch leagues, teams, fixtures
-    - `download_fixture_details.py` - Fetch detailed fixture data
-    - `process_to_database.py` - Process raw JSON to SQLite
-2. Implement a basic CLI for managing the data pipeline:
-    
-    - Data fetch commands
-    - Processing commands
-    - Status reporting
-
-### Step 6: Testing & Validation (2-3 days)
-
-1. Test each pipeline component
-2. Verify data integrity in SQLite
-3. Run sample queries to confirm model readiness
-4. Performance optimization if needed
-
-## Phase 3: Sample Implementation Process
-
-Here's how to proceed day-by-day:
-
-### Week 1: Framework & Core Data
-
-- **Day 1-2**: Create remaining API resource classes
-- **Day 3-4**: Implement download scripts for core entities
-- **Day 5**: Setup SQLite database and basic tables
-
-### Week 2: Detailed Data & Processing
-
-- **Day 1-2**: Implement fixture details download
-- **Day 3-4**: Create JSON processing functions
-- **Day 5**: Develop database insertion logic
-
-### Week 3: Integration & Testing
-
-- **Day 1-2**: Integrate components into pipeline
-- **Day 3-4**: Test with sample data and queries
-- **Day 5**: Documentation and final refinements
+### Step 4: Testing & Validation (Ongoing)
+1.  Test each sync script individually.
+2.  Verify data integrity in the SQLite database after each sync.
+3.  Run sample queries (like those in `Database planning.txt`) to ensure data is suitable for the prediction model.
 
 ## Immediate Next Steps
-
-1. **Create a small proof of concept**:
-    
-    - Download a single league's fixtures
-    - Download details for 2-3 fixtures
-    - Process and insert into SQLite
-    - Run sample queries
-2. **Conduct API exploration**:
-    
-    - Test API calls to understand exact response formats
-    - Document field mappings between API and database schema
-    - Identify any missing data points in the API
-3. **Refine the data model**:
-    
-    - Adjust tables/fields based on actual API responses
-    - Focus on capturing all data needed for predictions
-
-Remember to implement incrementally, test frequently, and prioritize the data elements most essential to your prediction model.
+1.  Refactor `sync_leagues.py` as described above, moving logic to `src/data/processors.py` and `src/data/storage.py`.
+2.  Update `README.md` to reflect this sync script pattern.
+3.  Begin implementing the sync script for the next required resource (e.g., `sync_seasons.py`).
