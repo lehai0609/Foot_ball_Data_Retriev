@@ -24,6 +24,8 @@ var/
 
 # Data
 data/
+!src/data/
+
 
 # Virtual Environment
 venv/
