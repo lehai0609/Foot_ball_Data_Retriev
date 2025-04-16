@@ -1,140 +1,250 @@
 # src/data/processors.py
 from datetime import datetime
-import logging # Import logging
+import logging
 
-# Configure basic logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Configure basic logging (ensure it's configured somewhere in your project)
+# Example: logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# If not configured elsewhere, uncomment the line above or configure appropriately.
 
 # --- Existing Processors ---
 def process_league_data(raw_league_data):
     """Transforms raw league API data for database insertion."""
+    # Based on original processors.py
+    if not raw_league_data or not isinstance(raw_league_data, dict):
+        logging.warning("Invalid raw league data received.")
+        return None
+
     current_season_id = None
-    if raw_league_data.get("currentseason") and isinstance(raw_league_data["currentseason"], dict):
-        current_season_id = raw_league_data["currentseason"].get("id")
+    # Safely access nested 'currentseason' dictionary and its 'id'
+    current_season_info = raw_league_data.get("currentseason")
+    if current_season_info and isinstance(current_season_info, dict):
+        current_season_id = current_season_info.get("id")
+
     processed = {
-        "league_id": raw_league_data.get("id"), "sport_id": raw_league_data.get("sport_id"),
-        "country_id": raw_league_data.get("country_id"), "name": raw_league_data.get("name"),
-        "active": raw_league_data.get("active"), "short_code": raw_league_data.get("short_code"),
-        "image_path": raw_league_data.get("image_path"), "type": raw_league_data.get("type"),
-        "sub_type": raw_league_data.get("sub_type"), "last_played_at": raw_league_data.get("last_played_at"),
-        "category": raw_league_data.get("category"), "current_season_id": current_season_id
+        "league_id": raw_league_data.get("id"),
+        "sport_id": raw_league_data.get("sport_id"),
+        "country_id": raw_league_data.get("country_id"),
+        "name": raw_league_data.get("name"),
+        "active": raw_league_data.get("active"),
+        "short_code": raw_league_data.get("short_code"),
+        "image_path": raw_league_data.get("image_path"),
+        "type": raw_league_data.get("type"),
+        "sub_type": raw_league_data.get("sub_type"),
+        "last_played_at": raw_league_data.get("last_played_at"),
+        "category": raw_league_data.get("category"),
+        "current_season_id": current_season_id
     }
+    # Basic validation
     if not processed["league_id"] or not processed["name"]:
-        logging.warning(f"Skipping league due to missing ID or name: {raw_league_data.get('id')}")
+        logging.warning(f"Skipping league due to missing ID or name: ID={raw_league_data.get('id')}, Name={raw_league_data.get('name')}")
         return None
     return processed
 
-def process_season_data(raw_season_data):
+def process_season_data(raw_season_data, league_name=None):
     """Transforms raw season API data for database insertion."""
-    if not raw_season_data or not isinstance(raw_season_data, dict): return None
+    # Based on original processors.py
+    if not raw_season_data or not isinstance(raw_season_data, dict):
+        logging.warning("Invalid raw season data received.")
+        return None
+
     processed = {
-        "season_id": raw_season_data.get("id"), "league_id": raw_season_data.get("league_id"),
-        "sport_id": raw_season_data.get("sport_id"), "name": raw_season_data.get("name"),
-        "is_current": raw_season_data.get("is_current"), "finished": raw_season_data.get("finished"),
-        "pending": raw_season_data.get("pending"), "starting_at": raw_season_data.get("starting_at"),
-        "ending_at": raw_season_data.get("ending_at"), "standings_recalculated_at": raw_season_data.get("standings_recalculated_at")
+        "season_id": raw_season_data.get("id"),
+        "league_id": raw_season_data.get("league_id"),
+        "league_name": league_name, # Passed in from context (e.g., sync_leagues)
+        "sport_id": raw_season_data.get("sport_id"),
+        "name": raw_season_data.get("name"),
+        "is_current": raw_season_data.get("is_current"),
+        "finished": raw_season_data.get("finished"),
+        "pending": raw_season_data.get("pending"),
+        "starting_at": raw_season_data.get("starting_at"),
+        "ending_at": raw_season_data.get("ending_at"),
+        "standings_recalculated_at": raw_season_data.get("standings_recalculated_at")
     }
+    # Basic validation
     if not processed["season_id"] or not processed["league_id"] or not processed["name"]:
-        logging.warning(f"Skipping season due to missing ID, league_id, or name: {raw_season_data.get('id')}")
+        logging.warning(f"Skipping season due to missing ID, league_id, or name: ID={raw_season_data.get('id')}, LeagueID={raw_season_data.get('league_id')}, Name={raw_season_data.get('name')}")
         return None
     return processed
 
 def process_team_data(raw_team_data):
     """Transforms raw team API data for database insertion."""
+    # Based on original processors.py
+    if not raw_team_data or not isinstance(raw_team_data, dict):
+        logging.warning("Invalid raw team data received.")
+        return None
+
     processed = {
-        "team_id": raw_team_data.get("id"), "name": raw_team_data.get("name"),
-        "short_code": raw_team_data.get("short_code"), "country_id": raw_team_data.get("country_id"),
-        "logo_url": raw_team_data.get("image_path"), "venue_id": raw_team_data.get("venue_id"),
-        "founded": raw_team_data.get("founded"), "type": raw_team_data.get("type"),
-        "national_team": raw_team_data.get("national_team", False)
+        "team_id": raw_team_data.get("id"),
+        "name": raw_team_data.get("name"),
+        "short_code": raw_team_data.get("short_code"),
+        "country_id": raw_team_data.get("country_id"),
+        "logo_url": raw_team_data.get("image_path"), # Map image_path to logo_url
+        "venue_id": raw_team_data.get("venue_id"),
+        "founded": raw_team_data.get("founded"),
+        "type": raw_team_data.get("type"),
+        "national_team": raw_team_data.get("national_team", False) # Default to False if missing
     }
+    # Basic validation
     if not processed["team_id"] or not processed["name"]:
-        logging.warning(f"Skipping team due to missing ID or name: {raw_team_data.get('id')}")
+        logging.warning(f"Skipping team due to missing ID or name: ID={raw_team_data.get('id')}, Name={raw_team_data.get('name')}")
         return None
     return processed
 
 def process_schedule_simple(raw_schedule_data):
     """Processes schedule data to extract fixture_id, season_id, round_id, round_finished."""
+    # Based on original processors.py
     processed_schedule_entries = []
-    if not raw_schedule_data or 'data' not in raw_schedule_data: return processed_schedule_entries
+    if not raw_schedule_data or 'data' not in raw_schedule_data or not isinstance(raw_schedule_data['data'], list):
+        logging.warning("Invalid or empty schedule data received.")
+        return processed_schedule_entries
+
+    # The schedule endpoint structure seems to be a list of stages, each containing rounds, each containing fixtures.
     for stage_data in raw_schedule_data['data']:
-        if 'rounds' not in stage_data or not isinstance(stage_data['rounds'], list): continue
+        # Check if stage_data is a dictionary and contains 'rounds'
+        if not isinstance(stage_data, dict) or 'rounds' not in stage_data or not isinstance(stage_data['rounds'], list):
+            # logging.debug(f"Skipping stage due to missing or invalid 'rounds': {stage_data.get('id', 'N/A')}")
+            continue
+
         for round_data in stage_data['rounds']:
-            if not round_data or not isinstance(round_data, dict): continue
-            round_id = round_data.get("id"); season_id = round_data.get("season_id")
-            round_finished = round_data.get("finished");
-            if not round_id or not season_id: continue
+            # Check if round_data is a dictionary and contains necessary keys
+            if not isinstance(round_data, dict):
+                # logging.debug("Skipping invalid round data (not a dict).")
+                continue
+
+            round_id = round_data.get("id")
+            season_id = round_data.get("season_id")
+            round_finished = round_data.get("finished") # Can be True/False or potentially missing
+
+            # Need at least round_id and season_id to link fixtures
+            if not round_id or not season_id:
+                # logging.debug(f"Skipping round due to missing round_id or season_id: RoundID={round_id}, SeasonID={season_id}")
+                continue
+
+            # Check if 'fixtures' exist and is a list
             if 'fixtures' in round_data and isinstance(round_data['fixtures'], list):
                 for fixture_data in round_data['fixtures']:
-                     if fixture_data and isinstance(fixture_data, dict) and 'id' in fixture_data:
+                    # Check if fixture_data is a dictionary and has an 'id'
+                     if isinstance(fixture_data, dict) and 'id' in fixture_data:
                          fixture_id = fixture_data.get('id')
-                         if fixture_id:
+                         if fixture_id: # Ensure fixture_id is not None or 0
                              processed_schedule_entries.append({
-                                 "fixture_id": fixture_id, "season_id": season_id,
-                                 "round_id": round_id, "round_finished": round_finished
+                                 "fixture_id": fixture_id,
+                                 "season_id": season_id,
+                                 "round_id": round_id,
+                                 "round_finished": round_finished # Store whatever value is provided (True/False/None)
                              })
+                         # else:
+                             # logging.debug(f"Skipping fixture in round {round_id} due to missing fixture_id.")
+                     # else:
+                         # logging.debug(f"Skipping invalid fixture data in round {round_id} (not a dict or missing 'id').")
+            # else:
+                # logging.debug(f"No 'fixtures' list found in round {round_id}.")
+
+    logging.info(f"Processed {len(processed_schedule_entries)} schedule entries.")
     return processed_schedule_entries
 
-# --- Fixture Stats Processor (Long Format - Corrected) ---
 
-# Mapping from API stat codes to database column names defined in Database planning.txt
-# Add more mappings here as needed based on the table schema and API codes
+# --- Fixture Stats Processor (Long Format - REVISED) ---
+
+# Mapping from API stat codes to database column names (REVISED)
+# !!! YOU MUST VERIFY THE API CODES MARKED WITH 'TODO' AGAINST SPORTMONKS DOCS !!!
 STAT_CODE_TO_DB_COLUMN = {
+    # Standard Stats (likely correct codes)
     'goals': 'goals',
     'corners': 'corners',
-    'ball-possession': 'possession',
-    'shots-total': 'shots_total', # Example if you add this column
+    'ball-possession': 'ball_possession', # Note DB column name change
+    'shots-total': 'shots_total',
     'shots-on-target': 'shots_on_target',
     'shots-off-target': 'shots_off_target',
-    'shots-blocked': 'shots_blocked', # Example if you add this column
+    'shots-blocked': 'shots_blocked',
     'fouls': 'fouls',
-    'yellowcards': 'yellow_cards', # Note the underscore
-    'redcards': 'red_cards',       # Note the underscore
-    'offsides': 'offsides',         # Example if you add this column
-    'saves': 'saves',               # Example if you add this column
-    'hit-woodwork': 'hit_woodwork', # Example if you add this column
-    # Add other relevant mappings...
+    'yellowcards': 'yellow_cards',
+    'redcards': 'red_cards',
+    'offsides': 'offsides',
+    'saves': 'saves',
+    'hit-woodwork': 'hit_woodwork',
+    'substitutions': 'substitutions',
+
+    # New Stats (CODES BELOW ARE EDUCATED GUESSES - VERIFY THEM!)
+    'shots-insidebox': 'shots_insidebox',             # TODO: Verify API code (e.g., 'shots-insidebox'?)
+    'dribbles-successful': 'successful_dribbles',       # TODO: Verify API code (e.g., 'dribbles-successful'?)
+    'dribbles-success-rate': 'successful_dribbles_percentage', # TODO: Verify API code (e.g., 'dribbles-success-rate'?)
+    'passes-successful': 'successful_passes',         # TODO: Verify API code (e.g., 'passes-successful'?)
+    'pass-accuracy': 'successful_passes_percentage',  # TODO: Verify API code (e.g., 'pass-accuracy'?)
+    'shots-outsidebox': 'shots_outsidebox',           # TODO: Verify API code (e.g., 'shots-outsidebox'?)
+    'dribble-attempts': 'dribble_attempts',           # TODO: Verify API code (e.g., 'dribble-attempts'?)
+    'throw-ins': 'throwins',                          # TODO: Verify API code (e.g., 'throw-ins'?)
+    'assists': 'assists',                             # TODO: Verify API code (e.g., 'assists'?)
+    'crosses-accurate': 'accurate_crosses',           # TODO: Verify API code (e.g., 'crosses-accurate'?)
+    'crosses-total': 'total_crosses',                 # TODO: Verify API code (e.g., 'crosses-total'?)
+    'penalties': 'penalties',                         # TODO: Verify API code (e.g., 'penalties'? - check if this means goals or awarded)
+    'passes-total': 'passes',                         # TODO: Verify API code (e.g., 'passes-total'?)
+    'attacks': 'attacks',                             # TODO: Verify API code (e.g., 'attacks'?)
+    'challenges': 'challenges',                       # TODO: Verify API code (e.g., 'challenges' or 'tackles'?)
+    'passes-long': 'long_passes',                     # TODO: Verify API code (e.g., 'passes-long'?)
+    'goalkicks': 'goal_kicks',                        # TODO: Verify API code (e.g., 'goalkicks'?)
+    'passes-key': 'key_passes',                       # TODO: Verify API code (e.g., 'passes-key'?)
+    'attacks-dangerous': 'dangerous_attacks',         # TODO: Verify API code (e.g., 'attacks-dangerous'?)
 }
 
-# Define expected Python types for database columns (used for safe conversion)
-# Add entries for any additional columns you add to fixture_stats table
+# Define expected Python types for database columns (REVISED)
+# Ensure this matches your new schema exactly
 DB_COLUMN_TYPES = {
     'goals': int,
-    'corners': int,
-    'possession': float,
-    'shots_total': int,
     'shots_on_target': int,
     'shots_off_target': int,
-    'shots_blocked': int,
+    'ball_possession': float, # Percentage
+    'corners': int,
     'fouls': int,
     'yellow_cards': int,
     'red_cards': int,
+    'shots_total': int,
+    'shots_blocked': int,
     'offsides': int,
     'saves': int,
     'hit_woodwork': int,
+    'shots_insidebox': int,
+    'successful_dribbles': int,
+    'successful_dribbles_percentage': float, # Percentage
+    'successful_passes': int,
+    'successful_passes_percentage': float, # Percentage
+    'shots_outsidebox': int,
+    'dribble_attempts': int,
+    'throwins': int,
+    'assists': int,
+    'accurate_crosses': int,
+    'total_crosses': int,
+    'penalties': int,
+    'passes': int,
+    'attacks': int,
+    'challenges': int,
+    'long_passes': int,
+    'goal_kicks': int,
+    'key_passes': int,
+    'dangerous_attacks': int,
+    'substitutions': int,
 }
 
 
 def map_period_description(description):
     """Maps API period description to database period string."""
-    # Simple mapping, adjust based on how you want to store period info
-    if description == "1st-half": return "first_half"
-    if description == "2nd-half": return "second_half"
-    if description == "extra-time": return "extra_time"
-    if description == "penalties": return "penalties"
-    # Consider how to handle full-time stats. Often, the stats in the *last*
-    # period object (e.g., '2nd-half' or 'extra-time') represent the full match stats.
-    # You might need to check the fixture state_id as well.
-    # For simplicity, let's assume for now we only store stats explicitly listed per period.
-    # You could calculate full_match stats later by summing half-time stats if needed.
+    # Existing mapping, check if SportMonks provides 'full_match' or others
+    if not description: return None # Handle null description
+    desc_lower = description.lower()
+    if "1st-half" in desc_lower or "first half" in desc_lower : return "first_half"
+    if "2nd-half" in desc_lower or "second half" in desc_lower: return "second_half"
+    if "extra-time" in desc_lower: return "extra_time" # Handle potential extra time stats
+    if "penalties" in desc_lower: return "penalties"   # Handle potential penalty shootout stats
+    # If API provides a period like 'Full-Time', map it here:
+    # if "full-time" in desc_lower or "full time" in desc_lower: return "full_match" # Example
     logging.debug(f"Unmapped period description: {description}")
     return description # Return original if no specific mapping
+
 
 def process_fixture_stats_long(raw_fixture_data):
     """
     Processes the raw response from the /fixtures/{id}?include=periods.statistics.type endpoint
-    into a 'long' format list suitable for the fixture_stats table.
-    Each element in the list represents one row (fixture, team, period).
+    into a 'long' format list suitable for the revised fixture_stats table.
     Handles missing stats gracefully.
     """
     processed_rows = []
@@ -143,6 +253,11 @@ def process_fixture_stats_long(raw_fixture_data):
         return processed_rows
 
     fixture_main_data = raw_fixture_data['data']
+    # Ensure main data is a dict
+    if not isinstance(fixture_main_data, dict):
+        logging.warning("Fixture data is not a dictionary.")
+        return processed_rows
+
     fixture_id = fixture_main_data.get('id')
     if not fixture_id:
         logging.warning("Fixture data missing ID.")
@@ -151,46 +266,64 @@ def process_fixture_stats_long(raw_fixture_data):
     fetch_time = datetime.now().isoformat() # Timestamp for the 'timestamp' column
 
     if 'periods' not in fixture_main_data or not isinstance(fixture_main_data['periods'], list):
-        logging.warning(f"No periods array found for fixture {fixture_id}.")
+        logging.info(f"No periods array found for fixture {fixture_id}. No stats to process.")
         return processed_rows
 
     # Process stats for each period
     for period_data in fixture_main_data['periods']:
+        if not isinstance(period_data, dict):
+            logging.warning(f"Skipping invalid period data (not a dict) in fixture {fixture_id}")
+            continue
+
         period_id = period_data.get('id')
+        # Use helper function to map standard descriptions
         period_desc = map_period_description(period_data.get('description'))
 
         if not period_id or not period_desc:
-            logging.warning(f"Skipping period due to missing id or description in fixture {fixture_id}")
+            logging.warning(f"Skipping period due to missing id or unmapped description ('{period_data.get('description')}') in fixture {fixture_id}")
             continue
 
         # Group stats by participant (team) within this period
         stats_by_team = {} # {team_id: {stat_code: value}}
         if 'statistics' in period_data and isinstance(period_data['statistics'], list):
             for stat_item in period_data['statistics']:
+                if not isinstance(stat_item, dict):
+                    logging.warning(f"Skipping invalid stat item (not a dict) in fixture {fixture_id}, period {period_desc}")
+                    continue
+
                 stat_type = stat_item.get('type')
                 stat_data = stat_item.get('data')
-                participant_id = stat_item.get('participant_id')
+                participant_id = stat_item.get('participant_id') # This is the team_id
 
-                if not stat_type or not stat_data or not participant_id:
-                    continue # Skip invalid stat item
+                # Basic validation of stat item structure
+                if not isinstance(stat_type, dict) or stat_data is None or not participant_id:
+                    # logging.debug(f"Skipping invalid stat item structure in fixture {fixture_id}, period {period_desc}: {stat_item}")
+                    continue
 
                 stat_code = stat_type.get('code')
-                value = stat_data.get('value')
+                # Value can be 0, so check 'value' key exists within stat_data dict
+                value = stat_data.get('value') if isinstance(stat_data, dict) else None
 
                 if participant_id not in stats_by_team:
                     stats_by_team[participant_id] = {}
 
-                if stat_code:
+                # Store the stat if the code is known and value is not None
+                if stat_code and value is not None:
                     stats_by_team[participant_id][stat_code] = value
+                # else:
+                    # logging.debug(f"Skipping stat with code {stat_code} or value {value} for team {participant_id} in fixture {fixture_id}")
+
 
         # Create a row for each team in this period
         for team_id, team_stats in stats_by_team.items():
+            # Initialize row with all possible columns from the DB schema mapping
+            # Ensure all keys from DB_COLUMN_TYPES are present
             row = {
                 "fixture_id": fixture_id,
                 "team_id": team_id,
                 "period": period_desc,
                 "timestamp": fetch_time,
-                # Initialize all known stat columns to None
+                 # Initialize all stat columns to None
                 **{col: None for col in DB_COLUMN_TYPES.keys()}
             }
 
@@ -207,15 +340,28 @@ def process_fixture_stats_long(raw_fixture_data):
                     # Attempt safe type conversion
                     if target_type:
                         try:
+                            # Specific handling for boolean-like stats if needed
+                            # E.g., if API sends 1/0 for a boolean field mapped to INTEGER
+                            # if target_type is bool and db_column == 'some_bool_column':
+                            #     row[db_column] = bool(int(raw_value)) # Example
+                            # else:
                             row[db_column] = target_type(raw_value)
-                        except (ValueError, TypeError):
-                            logging.warning(f"Could not convert value '{raw_value}' to type {target_type.__name__} for {db_column} in fixture {fixture_id}, team {team_id}, period {period_desc}. Setting to NULL.")
+                        except (ValueError, TypeError) as conv_err:
+                            logging.warning(f"Could not convert value '{raw_value}' ({type(raw_value).__name__}) to type {target_type.__name__} for {db_column} (API code: {api_code}) in fixture {fixture_id}, team {team_id}, period {period_desc}. Error: {conv_err}. Setting to NULL.")
                             row[db_column] = None # Set to None on conversion error
                     else:
-                        # If type not defined in DB_COLUMN_TYPES, store as is (likely TEXT)
+                        # Should not happen if DB_COLUMN_TYPES is comprehensive
                         row[db_column] = raw_value
+                        logging.warning(f"No target type defined in DB_COLUMN_TYPES for column '{db_column}'. Storing raw value.")
+
 
             processed_rows.append(row)
+
+    if not processed_rows and 'periods' in fixture_main_data and fixture_main_data['periods']:
+         logging.info(f"No processable statistics found within periods for fixture {fixture_id}.")
+    elif not processed_rows:
+         # This case handles when 'periods' was missing or empty initially
+         pass # Already logged earlier
 
     return processed_rows
 
