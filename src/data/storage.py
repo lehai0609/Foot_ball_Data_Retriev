@@ -95,13 +95,12 @@ def create_fixture_stats_table(conn):
         fouls INTEGER DEFAULT 0,            -- Mapped from 'fouls'
         yellow_cards INTEGER DEFAULT 0,     -- Mapped from 'yellowcards'
         red_cards INTEGER DEFAULT 0,        -- Mapped from 'redcards'
-        # Add other columns from your planning doc as needed, ensure they allow NULL or have DEFAULT
-        # Example:
-        # shots_total INTEGER DEFAULT 0,
-        # shots_blocked INTEGER DEFAULT 0,
-        # offsides INTEGER DEFAULT 0,
-        # saves INTEGER DEFAULT 0,
-        # hit_woodwork INTEGER DEFAULT 0,
+        -- Add other columns from your planning doc as needed, ensure they allow NULL or have DEFAULT
+        shots_total INTEGER DEFAULT 0,
+        shots_blocked INTEGER DEFAULT 0,
+        offsides INTEGER DEFAULT 0,
+        saves INTEGER DEFAULT 0,
+        hit_woodwork INTEGER DEFAULT 0,
         timestamp DATETIME,                 -- Timestamp when the stat was recorded/fetched (optional)
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
