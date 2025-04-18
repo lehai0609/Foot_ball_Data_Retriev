@@ -152,76 +152,70 @@ STAT_CODE_TO_DB_COLUMN = {
     # Standard Stats (likely correct codes)
     'goals': 'goals',
     'corners': 'corners',
-    'ball-possession': 'ball_possession', # Note DB column name change
-    'shots-total': 'shots_total',
-    'shots-on-target': 'shots_on_target',
-    'shots-off-target': 'shots_off_target',
-    'shots-blocked': 'shots_blocked',
+    'ball-possession': 'ball-possession', # Note DB column name change
+    'shots-total': 'shots-total',
+    'shots-on-target': 'shots-on-target',
+    'shots-off-target': 'shots-off-target',
+    'shots-blocked': 'shots-blocked',
     'fouls': 'fouls',
-    'yellowcards': 'yellow_cards',
-    'redcards': 'red_cards',
+    'yellowcards': 'yellowcards',
+    'redcards': 'redcards',
     'offsides': 'offsides',
     'saves': 'saves',
-    'hit-woodwork': 'hit_woodwork',
+    'hit-woodwork': 'hit-woodwork',
     'substitutions': 'substitutions',
-
-    # New Stats (CODES BELOW ARE EDUCATED GUESSES - VERIFY THEM!)
-    'shots-insidebox': 'shots_insidebox',             # TODO: Verify API code (e.g., 'shots-insidebox'?)
-    'dribbles-successful': 'successful_dribbles',       # TODO: Verify API code (e.g., 'dribbles-successful'?)
-    'dribbles-success-rate': 'successful_dribbles_percentage', # TODO: Verify API code (e.g., 'dribbles-success-rate'?)
-    'passes-successful': 'successful_passes',         # TODO: Verify API code (e.g., 'passes-successful'?)
-    'pass-accuracy': 'successful_passes_percentage',  # TODO: Verify API code (e.g., 'pass-accuracy'?)
-    'shots-outsidebox': 'shots_outsidebox',           # TODO: Verify API code (e.g., 'shots-outsidebox'?)
-    'dribble-attempts': 'dribble_attempts',           # TODO: Verify API code (e.g., 'dribble-attempts'?)
-    'throw-ins': 'throwins',                          # TODO: Verify API code (e.g., 'throw-ins'?)
-    'assists': 'assists',                             # TODO: Verify API code (e.g., 'assists'?)
-    'crosses-accurate': 'accurate_crosses',           # TODO: Verify API code (e.g., 'crosses-accurate'?)
-    'crosses-total': 'total_crosses',                 # TODO: Verify API code (e.g., 'crosses-total'?)
-    'penalties': 'penalties',                         # TODO: Verify API code (e.g., 'penalties'? - check if this means goals or awarded)
-    'passes-total': 'passes',                         # TODO: Verify API code (e.g., 'passes-total'?)
-    'attacks': 'attacks',                             # TODO: Verify API code (e.g., 'attacks'?)
-    'challenges': 'challenges',                       # TODO: Verify API code (e.g., 'challenges' or 'tackles'?)
-    'passes-long': 'long_passes',                     # TODO: Verify API code (e.g., 'passes-long'?)
-    'goalkicks': 'goal_kicks',                        # TODO: Verify API code (e.g., 'goalkicks'?)
-    'passes-key': 'key_passes',                       # TODO: Verify API code (e.g., 'passes-key'?)
-    'attacks-dangerous': 'dangerous_attacks',         # TODO: Verify API code (e.g., 'attacks-dangerous'?)
+    'shots-insidebox': 'shots_insidebox',
+    'successful-dribbles': 'successful-dribbles',
+    'successful-dribbles-percentage': 'successful-dribbles-percentage',
+    'successful-passes': 'successful-passes',
+    'successful-passes-percentage': 'successful-passes-percentage',
+    'shots-outsidebox': 'shots-outsidebox',
+    'dribble-attempts': 'dribble-attempts',
+    'throwins': 'throwins',
+    'assists': 'assists',
+    'accurate-crosses': 'accurate-crosses',
+    'crosses-total': 'total-crosses',
+    'penalties': 'penalties',
+    'passes-total': 'passes', 
+    'attacks': 'attacks',
+    'challenges': 'challenges',
+    'key-passes': 'key-passes',
+    'dangerous-attacks': 'dangerous-attacks',
 }
 
 # Define expected Python types for database columns (REVISED)
 # Ensure this matches your new schema exactly
 DB_COLUMN_TYPES = {
     'goals': int,
-    'shots_on_target': int,
-    'shots_off_target': int,
-    'ball_possession': float, # Percentage
+    'shots-on-target': int,
+    'shots-off-target': int,
+    'ball-possession': float, # Percentage
     'corners': int,
     'fouls': int,
-    'yellow_cards': int,
-    'red_cards': int,
+    'yellowcards': int,
+    'redcards': int,
     'shots_total': int,
     'shots_blocked': int,
     'offsides': int,
     'saves': int,
-    'hit_woodwork': int,
+    'hit-woodwork': int,
     'shots_insidebox': int,
-    'successful_dribbles': int,
-    'successful_dribbles_percentage': float, # Percentage
-    'successful_passes': int,
-    'successful_passes_percentage': float, # Percentage
-    'shots_outsidebox': int,
-    'dribble_attempts': int,
+    'successful-dribbles': int,
+    'successful-dribbles-percentage': float, # Percentage
+    'successful-passes': int,
+    'successful-passes-percentage': float, # Percentage
+    'shots-outsidebox': int,
+    'dribble-attempts': int,
     'throwins': int,
     'assists': int,
-    'accurate_crosses': int,
-    'total_crosses': int,
+    'accurate-crosses': int,
+    'total-crosses': int,
     'penalties': int,
     'passes': int,
     'attacks': int,
     'challenges': int,
-    'long_passes': int,
-    'goal_kicks': int,
-    'key_passes': int,
-    'dangerous_attacks': int,
+    'key-passes': int,
+    'dangerous-attacks': int,
     'substitutions': int,
 }
 
