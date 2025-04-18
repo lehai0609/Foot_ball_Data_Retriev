@@ -149,59 +149,71 @@ def create_schedules_table(conn):
     else: logging.error("Failed to ensure schedules table.")
 
 
-# --- Fixture Stats Table (NEW SCHEMA - From User) ---
+# --- Fixture Stats Table (REVISED SCHEMA - Aligned with Processor using Underscores) ---
 def create_fixture_stats_table(conn):
-    """Creates the fixture_stats table based on the revised schema."""
-    # Schema based on user-provided definition
+    """
+    Creates the fixture_stats table with column names consistently using
+    underscores, aligned with the revised processor dictionaries.
+    """
+    # Schema using underscores for all multi-word stat names
+    # Includes all columns from the revised processor dictionaries
     sql = """
     CREATE TABLE IF NOT EXISTS fixture_stats (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         fixture_id INTEGER NOT NULL,
         team_id INTEGER NOT NULL,           -- participant_id from the API stat item
         period TEXT NOT NULL,               -- e.g., 'first_half', 'second_half', 'extra_time'
+
+        -- Statistic columns (Aligned with underscore convention)
         goals INTEGER DEFAULT 0,
-        shots_on_target INTEGER DEFAULT 0,
-        shots_off_target INTEGER DEFAULT 0,
-        ball_possession REAL DEFAULT NULL,   -- Renamed from possession for clarity
+        shots_on_target INTEGER DEFAULT 0,   -- Corrected: underscore
+        shots_off_target INTEGER DEFAULT 0,  -- Corrected: underscore
+        ball_possession REAL DEFAULT NULL,   -- Corrected: underscore
         corners INTEGER DEFAULT 0,
         fouls INTEGER DEFAULT 0,
-        yellow_cards INTEGER DEFAULT 0,
-        red_cards INTEGER DEFAULT 0,
-        shots_total INTEGER DEFAULT 0,
+        yellow_cards INTEGER DEFAULT 0,      -- Consistent: underscore
+        red_cards INTEGER DEFAULT 0,         -- Consistent: underscore
+        shots_total INTEGER DEFAULT 0,       -- Consistent: underscore
         shots_blocked INTEGER DEFAULT 0,
         offsides INTEGER DEFAULT 0,
         saves INTEGER DEFAULT 0,
         hit_woodwork INTEGER DEFAULT 0,
-        shots_insidebox INTEGER DEFAULT 0,          -- NEW
-        successful_dribbles INTEGER DEFAULT 0,      -- NEW
-        successful_dribbles_percentage REAL DEFAULT NULL, -- NEW
-        successful_passes INTEGER DEFAULT 0,        -- NEW
-        successful_passes_percentage REAL DEFAULT NULL, -- NEW
-        shots_outsidebox INTEGER DEFAULT 0,         -- NEW
-        dribble_attempts INTEGER DEFAULT 0,         -- NEW
-        throwins INTEGER DEFAULT 0,                 -- NEW
-        assists INTEGER DEFAULT 0,                  -- NEW
-        accurate_crosses INTEGER DEFAULT 0,         -- NEW
-        total_crosses INTEGER DEFAULT 0,            -- NEW
-        penalties INTEGER DEFAULT 0,                -- NEW (May refer to goals from penalty or awarded penalties)
-        passes INTEGER DEFAULT 0,                   -- NEW
-        attacks INTEGER DEFAULT 0,                  -- NEW
-        challenges INTEGER DEFAULT 0,               -- NEW
-        long_passes INTEGER DEFAULT 0,              -- NEW
-        goal_kicks INTEGER DEFAULT 0,               -- NEW
-        key_passes INTEGER DEFAULT 0,               -- NEW
-        dangerous_attacks INTEGER DEFAULT 0,        -- NEW
-        substitutions INTEGER DEFAULT 0,            -- NEW
-        timestamp DATETIME,                         -- Timestamp when the stat was recorded/fetched
+        shots_insidebox INTEGER DEFAULT 0,
+        successful_dribbles INTEGER DEFAULT 0,
+        successful_dribbles_percentage REAL DEFAULT NULL,
+        successful_passes INTEGER DEFAULT 0,
+        successful_passes_percentage REAL DEFAULT NULL,
+        shots_outsidebox INTEGER DEFAULT 0,
+        dribble_attempts INTEGER DEFAULT 0,
+        throwins INTEGER DEFAULT 0,
+        assists INTEGER DEFAULT 0,
+        accurate_crosses INTEGER DEFAULT 0,
+        total_crosses INTEGER DEFAULT 0,     -- Consistent: underscore
+        penalties INTEGER DEFAULT 0,
+        passes INTEGER DEFAULT 0,
+        attacks INTEGER DEFAULT 0,
+        challenges INTEGER DEFAULT 0,
+        tackles INTEGER DEFAULT 0,           -- Added from processor dicts
+        interceptions INTEGER DEFAULT 0,     -- Added from processor dicts
+        long_passes INTEGER DEFAULT 0,
+        goal_kicks INTEGER DEFAULT 0,
+        key_passes INTEGER DEFAULT 0,        -- Consistent: underscore
+        dangerous_attacks INTEGER DEFAULT 0,
+        substitutions INTEGER DEFAULT 0,
+
+        -- Timestamps
+        timestamp DATETIME,                  -- Timestamp when the stat was recorded/fetched
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+        -- Constraints
         UNIQUE (fixture_id, team_id, period) -- Ensure uniqueness for a specific stat record
     );"""
+    # Use the existing helper function to execute the SQL
     if create_table(conn, sql):
-        logging.info("Fixture_Stats (revised) table ensured.")
+        logging.info("Fixture_Stats (aligned with underscores) table ensured.")
     else:
         logging.error("Failed to ensure fixture_stats table.")
-
 
 # --- Data Storage ---
 

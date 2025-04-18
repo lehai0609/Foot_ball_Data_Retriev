@@ -146,77 +146,86 @@ def process_schedule_simple(raw_schedule_data):
 
 # --- Fixture Stats Processor (Long Format - REVISED) ---
 
-# Mapping from API stat codes to database column names (REVISED)
-# !!! YOU MUST VERIFY THE API CODES MARKED WITH 'TODO' AGAINST SPORTMONKS DOCS !!!
+# Mapping from API stat codes to database column names (REVISED & ALIGNED)
+# Keys are the exact codes from the API list you provided.
+# Values are the corresponding database column names using underscores.
 STAT_CODE_TO_DB_COLUMN = {
-    # Standard Stats (likely correct codes)
-    'goals': 'goals',
-    'corners': 'corners',
-    'ball-possession': 'ball-possession', # Note DB column name change
-    'shots-total': 'shots-total',
-    'shots-on-target': 'shots-on-target',
-    'shots-off-target': 'shots-off-target',
-    'shots-blocked': 'shots-blocked',
-    'fouls': 'fouls',
-    'yellowcards': 'yellowcards',
-    'redcards': 'redcards',
-    'offsides': 'offsides',
-    'saves': 'saves',
-    'hit-woodwork': 'hit-woodwork',
-    'substitutions': 'substitutions',
     'shots-insidebox': 'shots_insidebox',
-    'successful-dribbles': 'successful-dribbles',
-    'successful-dribbles-percentage': 'successful-dribbles-percentage',
-    'successful-passes': 'successful-passes',
-    'successful-passes-percentage': 'successful-passes-percentage',
-    'shots-outsidebox': 'shots-outsidebox',
-    'dribble-attempts': 'dribble-attempts',
+    'shots-on-target': 'shots_on_target',
+    'shots-blocked': 'shots_blocked',
+    'shots-total': 'shots_total',
+    'successful-dribbles': 'successful_dribbles',
+    'goals': 'goals',
+    'successful-dribbles-percentage': 'successful_dribbles_percentage',
+    'successful-passes': 'successful_passes',
+    'successful-passes-percentage': 'successful_passes_percentage',
+    'ball-possession': 'ball_possession',
+    'redcards': 'red_cards', # Changed to underscore
+    'tackles': 'tackles',     # New stat
+    'substitutions': 'substitutions',
+    'interceptions': 'interceptions', # New stat
+    'shots-outsidebox': 'shots_outsidebox',
+    'dribble-attempts': 'dribble_attempts',
+    'yellowcards': 'yellow_cards', # Changed to underscore
     'throwins': 'throwins',
     'assists': 'assists',
-    'accurate-crosses': 'accurate-crosses',
-    'crosses-total': 'total-crosses',
+    'accurate-crosses': 'accurate_crosses',
+    'corners': 'corners',
+    'saves': 'saves',
+    'fouls': 'fouls',
+    'total-crosses': 'total_crosses', # Changed to underscore
+    'hit-woodwork': 'hit_woodwork',
+    'long-passes': 'long_passes',
     'penalties': 'penalties',
-    'passes-total': 'passes', 
+    'passes': 'passes', # Kept as is (matches 'passes-total' intent if API code is just 'passes') - *Verify API code if needed*
+    'shots-off-target': 'shots_off_target',
     'attacks': 'attacks',
+    'key-passes': 'key_passes', # Changed to underscore
+    'offsides': 'offsides',
     'challenges': 'challenges',
-    'key-passes': 'key-passes',
-    'dangerous-attacks': 'dangerous-attacks',
+    'goals-kicks': 'goal_kicks', # Changed API code from list ('goals-kicks' -> goal_kicks)
+    'dangerous-attacks': 'dangerous_attacks'
 }
 
-# Define expected Python types for database columns (REVISED)
-# Ensure this matches your new schema exactly
+# Define expected Python types for database columns (REVISED & ALIGNED)
+# Keys MUST exactly match the database column names (values from STAT_CODE_TO_DB_COLUMN).
+# Values are the target Python types for conversion.
 DB_COLUMN_TYPES = {
-    'goals': int,
-    'shots-on-target': int,
-    'shots-off-target': int,
-    'ball-possession': float, # Percentage
-    'corners': int,
-    'fouls': int,
-    'yellowcards': int,
-    'redcards': int,
-    'shots_total': int,
-    'shots_blocked': int,
-    'offsides': int,
-    'saves': int,
-    'hit-woodwork': int,
     'shots_insidebox': int,
-    'successful-dribbles': int,
-    'successful-dribbles-percentage': float, # Percentage
-    'successful-passes': int,
-    'successful-passes-percentage': float, # Percentage
-    'shots-outsidebox': int,
-    'dribble-attempts': int,
+    'shots_on_target': int,
+    'shots_blocked': int,
+    'shots_total': int,
+    'successful_dribbles': int,
+    'goals': int,
+    'successful_dribbles_percentage': float, # Percentage
+    'successful_passes': int,
+    'successful_passes_percentage': float, # Percentage
+    'ball_possession': float,               # Percentage
+    'red_cards': int,
+    'tackles': int,                         # New stat - Assuming int
+    'substitutions': int,
+    'interceptions': int,                   # New stat - Assuming int
+    'shots_outsidebox': int,
+    'dribble_attempts': int,
+    'yellow_cards': int,
     'throwins': int,
     'assists': int,
-    'accurate-crosses': int,
-    'total-crosses': int,
+    'accurate_crosses': int,
+    'corners': int,
+    'saves': int,
+    'fouls': int,
+    'total_crosses': int,
+    'hit_woodwork': int,
+    'long_passes': int,
     'penalties': int,
     'passes': int,
+    'shots_off_target': int,
     'attacks': int,
+    'key_passes': int,
+    'offsides': int,
     'challenges': int,
-    'key-passes': int,
-    'dangerous-attacks': int,
-    'substitutions': int,
+    'goal_kicks': int,                      # Changed from 'goals-kicks'
+    'dangerous_attacks': int
 }
 
 
