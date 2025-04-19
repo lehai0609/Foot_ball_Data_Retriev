@@ -2,9 +2,8 @@
 from datetime import datetime
 import logging
 
-# Configure basic logging (ensure it's configured somewhere in your project)
-# Example: logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-# If not configured elsewhere, uncomment the line above or configure appropriately.
+# Configure basic logging if not done elsewhere
+# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # --- Existing Processors ---
 def process_league_data(raw_league_data):
@@ -90,12 +89,37 @@ def process_team_data(raw_team_data):
         return None
     return processed
 
-def process_schedule_simple(raw_schedule_data):
-    """Processes schedule data to extract fixture_id, season_id, round_id, round_finished."""
-    # Based on original processors.py
+# --- REVISED Schedule Processor ---
+
+# Mapping from SportMonks state_id to standardized status codes
+# NOTE: This is a sample mapping based on common states.
+# You MUST verify and complete this mapping using the official SportMonks documentation.
+STATE_ID_TO_STATUS = {
+    1: 'NS',        # Not Started
+    2: 'LIVE',      # In Progress
+    3: 'HT',        # Half Time
+    4: 'ET',        # Extra Time
+    5: 'FT',        # Finished
+    6: 'FT_PEN',    # Finished after Penalties
+    7: 'POST',      # Postponed
+    8: 'CANC',      # Cancelled
+    9: 'ABD',       # Abandoned
+    10: 'AWD',      # Awarded (Walkover)
+    11: 'INT',      # Interrupted
+    # Add other states as needed from SportMonks docs (TBA, DELAYED, etc.)
+    17: 'TBA',      # To Be Announced (Time)
+    18: 'DEL',      # Delayed
+    # ... add more mappings ...
+}
+
+def process_schedule_detailed(raw_schedule_data):
+    """
+    Processes schedule data (from /schedules/seasons/{id}) to extract detailed
+    fixture information for the enhanced schedules table.
+    """
     processed_schedule_entries = []
     if not raw_schedule_data or 'data' not in raw_schedule_data or not isinstance(raw_schedule_data['data'], list):
-        logging.warning("Invalid or empty schedule data received.")
+        logging.warning("Invalid or empty schedule data received for detailed processing.")
         return processed_schedule_entries
 
     # The schedule endpoint structure seems to be a list of stages, each containing rounds, each containing fixtures.
@@ -112,8 +136,8 @@ def process_schedule_simple(raw_schedule_data):
                 continue
 
             round_id = round_data.get("id")
-            season_id = round_data.get("season_id")
-            round_finished = round_data.get("finished") # Can be True/False or potentially missing
+            season_id = round_data.get("season_id") # Season ID is at round level
+            round_finished = round_data.get("finished", False) # Default to False
 
             # Need at least round_id and season_id to link fixtures
             if not round_id or not season_id:
@@ -123,26 +147,119 @@ def process_schedule_simple(raw_schedule_data):
             # Check if 'fixtures' exist and is a list
             if 'fixtures' in round_data and isinstance(round_data['fixtures'], list):
                 for fixture_data in round_data['fixtures']:
-                    # Check if fixture_data is a dictionary and has an 'id'
-                     if isinstance(fixture_data, dict) and 'id' in fixture_data:
-                         fixture_id = fixture_data.get('id')
-                         if fixture_id: # Ensure fixture_id is not None or 0
-                             processed_schedule_entries.append({
-                                 "fixture_id": fixture_id,
-                                 "season_id": season_id,
-                                 "round_id": round_id,
-                                 "round_finished": round_finished # Store whatever value is provided (True/False/None)
-                             })
-                         # else:
-                             # logging.debug(f"Skipping fixture in round {round_id} due to missing fixture_id.")
-                     # else:
-                         # logging.debug(f"Skipping invalid fixture data in round {round_id} (not a dict or missing 'id').")
+                    if not isinstance(fixture_data, dict):
+                        logging.warning(f"Skipping invalid fixture data (not a dict) in round {round_id}")
+                        continue
+
+                    fixture_id = fixture_data.get('id')
+                    if not fixture_id:
+                        logging.warning(f"Skipping fixture in round {round_id} due to missing fixture_id.")
+                        continue
+
+                    # --- Extract Enhanced Fields ---
+                    league_id = fixture_data.get('league_id')
+                    start_time = fixture_data.get('starting_at') # 'YYYY-MM-DD HH:MM:SS'
+                    state_id = fixture_data.get('state_id')
+                    status = STATE_ID_TO_STATUS.get(state_id, 'UNKNOWN') # Map state_id to status
+                    result_info = fixture_data.get('result_info')
+
+                    home_team_id = None
+                    away_team_id = None
+                    home_winner = None # Track winner flag if available
+                    away_winner = None
+
+                    participants = fixture_data.get('participants', [])
+                    if isinstance(participants, list) and len(participants) == 2:
+                        for p in participants:
+                            if isinstance(p, dict):
+                                p_meta = p.get('meta', {})
+                                p_id = p.get('id')
+                                if isinstance(p_meta, dict) and p_id:
+                                    location = p_meta.get('location')
+                                    winner_flag = p_meta.get('winner') # Can be True, False, or None
+                                    if location == 'home':
+                                        home_team_id = p_id
+                                        home_winner = winner_flag
+                                    elif location == 'away':
+                                        away_team_id = p_id
+                                        away_winner = winner_flag
+                    else:
+                         logging.warning(f"Fixture {fixture_id}: Invalid or missing participants data.")
+                         # Skip if we can't determine teams
+                         continue
+
+                    # Ensure both teams were found
+                    if not home_team_id or not away_team_id:
+                        logging.warning(f"Fixture {fixture_id}: Could not determine home/away team IDs.")
+                        continue
+
+                    home_score = None
+                    away_score = None
+                    scores = fixture_data.get('scores', [])
+                    if isinstance(scores, list):
+                        # Find the score entry representing the final/current score
+                        # Prioritize 'CURRENT', then '2ND_HALF' (or others like 'ET', 'PEN')
+                        final_score_entry_home = None
+                        final_score_entry_away = None
+                        score_type_preference = ['CURRENT', 'PENALTIES', 'AET', '2ND_HALF', '1ST_HALF'] # Order of preference
+
+                        for score_type in score_type_preference:
+                            for s in scores:
+                                if isinstance(s, dict) and s.get('description') == score_type:
+                                    s_participant_id = s.get('participant_id')
+                                    s_goals = s.get('score', {}).get('goals')
+                                    if s_goals is not None: # Score can be 0
+                                        if s_participant_id == home_team_id and final_score_entry_home is None:
+                                            final_score_entry_home = s_goals
+                                        elif s_participant_id == away_team_id and final_score_entry_away is None:
+                                            final_score_entry_away = s_goals
+                            # Stop if we found both for this score type
+                            if final_score_entry_home is not None and final_score_entry_away is not None:
+                                home_score = final_score_entry_home
+                                away_score = final_score_entry_away
+                                break # Exit preference loop
+
+                    # Determine standardized result ('H', 'D', 'A') if scores are available
+                    result = None
+                    if home_score is not None and away_score is not None:
+                        if home_score > away_score:
+                            result = 'H'
+                        elif away_score > home_score:
+                            result = 'A'
+                        else:
+                            result = 'D'
+                    # Fallback using winner flag if scores are missing but winner is known (less reliable)
+                    elif result is None and status in ['FT', 'AET', 'FT_PEN', 'AWD']:
+                         if home_winner is True and away_winner is False:
+                             result = 'H'
+                         elif away_winner is True and home_winner is False:
+                             result = 'A'
+                         elif home_winner is False and away_winner is False: # Check for explicit non-winners for draw
+                             result = 'D'
+                         # else: winner flags might be null or inconsistent
+
+                    # --- Assemble Processed Entry ---
+                    processed_schedule_entries.append({
+                        "fixture_id": fixture_id,
+                        "season_id": season_id,
+                        "league_id": league_id,
+                        "round_id": round_id,
+                        "home_team_id": home_team_id,
+                        "away_team_id": away_team_id,
+                        "start_time": start_time,
+                        "status": status,
+                        "home_score": home_score,
+                        "away_score": away_score,
+                        "result": result,
+                        "result_info": result_info,
+                        "round_finished": round_finished
+                    })
+
             # else:
                 # logging.debug(f"No 'fixtures' list found in round {round_id}.")
 
-    logging.info(f"Processed {len(processed_schedule_entries)} schedule entries.")
+    logging.info(f"Processed {len(processed_schedule_entries)} detailed schedule entries.")
     return processed_schedule_entries
-
 
 # --- Fixture Stats Processor (Long Format - REVISED) ---
 
@@ -373,3 +490,12 @@ def process_fixture_stats_long(raw_fixture_data):
 # def process_fixture_details(raw_fixture_data): ... # To update main fixtures table
 # def process_odds_data(raw_odds_data, fixture_id): ...
 # def process_timeline_data(raw_event_data, fixture_id): ...
+
+# --- Deprecated simple processor ---
+# def process_schedule_simple(raw_schedule_data):
+#     """DEPRECATED: Processes schedule data to extract fixture_id, season_id, round_id, round_finished."""
+#     # Based on original processors.py
+#     processed_schedule_entries = []
+#     # ... (original logic) ...
+#     logging.warning("Using deprecated process_schedule_simple function.")
+#     return processed_schedule_entries

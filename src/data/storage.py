@@ -19,9 +19,8 @@ except ImportError:
     # DATABASE_PATH = Path("../data/database/football_data.db")
 
 
-# Configure basic logging (ensure it's configured somewhere in your project)
-# Example: logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-# If not configured elsewhere, uncomment the line above or configure appropriately.
+# Configure basic logging if not done elsewhere
+# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # --- Database Setup ---
 def get_db_connection():
@@ -133,20 +132,41 @@ def create_teams_table(conn):
     if create_table(conn, sql): logging.info("Teams table ensured.")
     else: logging.error("Failed to ensure teams table.")
 
+# --- REVISED create_schedules_table function ---
 def create_schedules_table(conn):
-    """Creates a simplified schedules table linking fixtures to seasons and rounds."""
-    # Based on original storage.py
+    """
+    Creates the schedules table, enhanced with key fixture details
+    suitable for analysis and modeling.
+    """
+    # Schema combining schedule context with core fixture details
     sql = """
     CREATE TABLE IF NOT EXISTS schedules (
-        fixture_id INTEGER PRIMARY KEY,
-        season_id INTEGER NOT NULL,
-        round_id INTEGER,
-        round_finished BOOLEAN,
+        fixture_id INTEGER PRIMARY KEY,     -- Unique ID for the match
+        season_id INTEGER NOT NULL,         -- ID of the season
+        league_id INTEGER,                  -- ID of the league (Added)
+        round_id INTEGER,                   -- ID of the round within the season/stage
+        home_team_id INTEGER NOT NULL,      -- ID of the home team (Added)
+        away_team_id INTEGER NOT NULL,      -- ID of the away team (Added)
+        start_time TEXT NOT NULL,           -- Match start time (Added, recommend storing as 'YYYY-MM-DD HH:MM:SS' TEXT or DATETIME)
+        status TEXT,                        -- Match status (Added, e.g., 'FT', 'NS', 'LIVE', 'PST', 'CANC')
+        home_score INTEGER,                 -- Final home score (Added, NULL if not finished/available)
+        away_score INTEGER,                 -- Final away score (Added, NULL if not finished/available)
+        result TEXT,                        -- Standardized result code (Added, 'H', 'D', 'A', or NULL)
+        result_info TEXT,                   -- Raw result description from API (Added, optional)
+        round_finished BOOLEAN,             -- Status of the round (Kept)
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        -- Optional: Define Foreign Key constraints later when teams/leagues tables are stable
+        -- FOREIGN KEY (season_id) REFERENCES seasons(season_id),
+        -- FOREIGN KEY (league_id) REFERENCES leagues(league_id),
+        -- FOREIGN KEY (home_team_id) REFERENCES teams(team_id),
+        -- FOREIGN KEY (away_team_id) REFERENCES teams(team_id)
     );"""
-    if create_table(conn, sql): logging.info("Schedules table ensured.")
-    else: logging.error("Failed to ensure schedules table.")
+    if create_table(conn, sql):
+        logging.info("Schedules table (enhanced) ensured.")
+    else:
+        logging.error("Failed to ensure schedules table.")
+# --- End of REVISED function ---
 
 
 # --- Fixture Stats Table (REVISED SCHEMA - Aligned with Processor using Underscores) ---
@@ -253,6 +273,7 @@ def store_data(conn, table_name, data_list, primary_key_column="id"):
                 continue
 
             # Prepare values, ensuring order matches columns derived from first_valid_item
+            # Handle potential missing keys in some items gracefully
             values = [item.get(col) for col in columns]
 
             # Check if the record exists (for counting purposes)
@@ -286,6 +307,10 @@ def store_data(conn, table_name, data_list, primary_key_column="id"):
         logging.error(f"Database error during storage in {table_name}: {e}") # Use logging
         logging.error(f"SQL attempted: {sql}")
         logging.error(f"Item causing error (potentially): {item_for_error}")
+        # Check for common errors like missing columns in the item
+        if "has no column named" in str(e):
+             logging.error(f"Possible cause: Item dictionary might be missing expected keys matching table columns.")
+             logging.error(f"Expected columns based on first item: {columns}")
         conn.rollback()
         return 0
     finally:
@@ -367,17 +392,31 @@ def create_update_trigger(conn, table_name, pk_column):
     # The WHEN clause prevents the trigger from firing during INSERT OR REPLACE's internal UPDATE
     # It should only fire on explicit UPDATE statements where the PK doesn't change.
     # Added check for OLD.updated_at = NEW.updated_at to prevent infinite loops if updated_at is manually set
+    # Adjusted WHEN clause: Trigger fires if updated_at is NOT being manually set to a different value
+    # OR if updated_at is not present in the UPDATE statement (handled implicitly by SQLite)
     sql = f"""
     CREATE TRIGGER IF NOT EXISTS {trigger_name}
     AFTER UPDATE ON {table_name}
     FOR EACH ROW
-    WHEN OLD.{pk_column} = NEW.{pk_column} AND OLD.updated_at = NEW.updated_at
+    WHEN OLD.{pk_column} = NEW.{pk_column} AND NEW.updated_at = OLD.updated_at
     BEGIN
         UPDATE {table_name}
         SET updated_at = CURRENT_TIMESTAMP
         WHERE {pk_column} = OLD.{pk_column};
     END;
     """
+    # --- Alternative WHEN clause (simpler, might fire slightly more often but should be safe):
+    # sql = f"""
+    # CREATE TRIGGER IF NOT EXISTS {trigger_name}
+    # AFTER UPDATE ON {table_name}
+    # FOR EACH ROW
+    # WHEN OLD.{pk_column} = NEW.{pk_column}
+    # BEGIN
+    #     UPDATE {table_name}
+    #     SET updated_at = CURRENT_TIMESTAMP
+    #     WHERE {pk_column} = OLD.{pk_column} AND updated_at != CURRENT_TIMESTAMP; -- Prevent self-triggering loop
+    # END;
+    # """
     cursor = None
     try:
         cursor = conn.cursor()
