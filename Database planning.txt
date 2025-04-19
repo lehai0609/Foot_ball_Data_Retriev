@@ -1,206 +1,281 @@
-## Suggested SQLite code
--- Leagues table
-CREATE TABLE leagues (
-    league_id INTEGER PRIMARY KEY,          -- From SportMonks API 'id'
-    sport_id INTEGER,                       -- From SportMonks API 'sport_id'
-    country_id INTEGER,                     -- From SportMonks API 'country_id'
-    name TEXT NOT NULL,                     -- From SportMonks API 'name'
-    active BOOLEAN DEFAULT 1,               -- From SportMonks API 'active'
-    short_code TEXT,                        -- From SportMonks API 'short_code' (nullable)
-    image_path TEXT,                        -- From SportMonks API 'image_path' (nullable)
-    type TEXT,                              -- From SportMonks API 'type' (e.g., 'league', 'cup')
-    sub_type TEXT,                          -- From SportMonks API 'sub_type' (e.g., 'domestic', 'domestic_cup')
-    last_played_at TEXT,                    -- From SportMonks API 'last_played_at' (ISO format string, nullable)
-    category INTEGER,                       -- From SportMonks API 'category' (nullable)
-    -- Database internal tracking timestamps
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+# Updated Database Planning (Reflecting Implementation & Plans)
 
--- Teams table
-CREATE TABLE teams (
-    team_id INTEGER PRIMARY KEY,  -- From SportMonks API
-    name TEXT NOT NULL,
-    short_name TEXT,
-    country_id INTEGER,
-    country_name TEXT,
-    logo_url TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+This document outlines the SQLite database schema, including currently implemented tables and those planned for future implementation, designed to store football data retrieved from the SportMonks v3 API.
 
--- Seasons table
-CREATE TABLE seasons (
-    season_id INTEGER PRIMARY KEY,  -- From SportMonks API
-    league_id INTEGER NOT NULL,
-    name TEXT NOT NULL,
-    start_date DATE,
-    end_date DATE,
-    is_current BOOLEAN DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (league_id) REFERENCES leagues(league_id)
-);
+## Database Schema
 
--- Fixtures table (central table)
-CREATE TABLE fixtures (
-    fixture_id INTEGER PRIMARY KEY,  -- From SportMonks API
-    season_id INTEGER NOT NULL,
-    league_id INTEGER NOT NULL,
-    home_team_id INTEGER NOT NULL,
-    away_team_id INTEGER NOT NULL,
-    start_time DATETIME NOT NULL,
-    status TEXT,  -- scheduled, in_play, finished
-    result TEXT,  -- home_win, away_win, draw
-    home_score INTEGER DEFAULT 0,
-    away_score INTEGER DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (season_id) REFERENCES seasons(season_id),
-    FOREIGN KEY (league_id) REFERENCES leagues(league_id),
-    FOREIGN KEY (home_team_id) REFERENCES teams(team_id),
-    FOREIGN KEY (away_team_id) REFERENCES teams(team_id)
-);
+The following tables are either implemented or planned:
 
--- Pre-match and In-play odds
-CREATE TABLE fixture_odds (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    fixture_id INTEGER NOT NULL,
-    bookmaker_id INTEGER,
-    bookmaker_name TEXT,
-    market_type TEXT NOT NULL,  -- 1x2, over_under, etc.
-    timestamp DATETIME NOT NULL,
-    stage TEXT NOT NULL,  -- pre_match, in_play
-    home_odds REAL,
-    draw_odds REAL,
-    away_odds REAL,
-    over_under_value REAL,  -- e.g., 2.5 goals
-    over_odds REAL,
-    under_odds REAL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (fixture_id) REFERENCES fixtures(fixture_id)
-);
+**1. `leagues` Table (Implemented)**
 
--- Match statistics
-CREATE TABLE fixture_stats (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    fixture_id INTEGER NOT NULL,
-    team_id INTEGER NOT NULL,
-    period TEXT NOT NULL,  -- first_half, full_match
-    goals INTEGER DEFAULT 0,
-    shots_on_target INTEGER DEFAULT 0,
-    shots_off_target INTEGER DEFAULT 0,
-    possession REAL,  -- percentage (0-100)
-    corners INTEGER DEFAULT 0,
-    fouls INTEGER DEFAULT 0,
-    yellow_cards INTEGER DEFAULT 0,
-    red_cards INTEGER DEFAULT 0,
-    timestamp DATETIME NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (fixture_id) REFERENCES fixtures(fixture_id),
-    FOREIGN KEY (team_id) REFERENCES teams(team_id)
-);
+* **Purpose:** Stores basic information about football leagues.
+* **Populated by:** `scripts/sync_leagues.py`
+* **Schema:**
+    ```sql
+    CREATE TABLE IF NOT EXISTS leagues (
+        league_id INTEGER PRIMARY KEY,          -- From SportMonks API 'id'
+        sport_id INTEGER,                       -- From SportMonks API 'sport_id'
+        country_id INTEGER,                     -- From SportMonks API 'country_id'
+        name TEXT NOT NULL,                     -- From SportMonks API 'name'
+        active BOOLEAN DEFAULT 1,               -- From SportMonks API 'active'
+        short_code TEXT,                        -- From SportMonks API 'short_code' (nullable)
+        image_path TEXT,                        -- From SportMonks API 'image_path' (nullable)
+        type TEXT,                              -- From SportMonks API 'type' (e.g., 'league', 'cup')
+        sub_type TEXT,                          -- From SportMonks API 'sub_type' (e.g., 'domestic', 'domestic_cup')
+        last_played_at TEXT,                    -- From SportMonks API 'last_played_at' (ISO format string, nullable)
+        category INTEGER,                       -- From SportMonks API 'category' (nullable)
+        current_season_id INTEGER,              -- From SportMonks API 'currentseason.id' (Added)
+        -- Database internal tracking timestamps
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    ```
 
--- Minute-by-minute timeline data
-CREATE TABLE fixture_timeline (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    fixture_id INTEGER NOT NULL,
-    minute INTEGER NOT NULL,
-    ball_x REAL,  -- x coordinate
-    ball_y REAL,  -- y coordinate
-    home_pressure_index REAL,
-    away_pressure_index REAL,
-    timestamp DATETIME NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (fixture_id) REFERENCES fixtures(fixture_id)
-);
+**2. `seasons` Table (Implemented)**
 
--- Create indexes for better query performance
-CREATE INDEX idx_fixtures_league ON fixtures(league_id, start_time);
-CREATE INDEX idx_fixtures_teams ON fixtures(home_team_id, away_team_id);
-CREATE INDEX idx_fixture_odds ON fixture_odds(fixture_id, bookmaker_id, market_type, timestamp);
-CREATE INDEX idx_fixture_stats ON fixture_stats(fixture_id, team_id, period);
-CREATE INDEX idx_fixture_timeline ON fixture_timeline(fixture_id, minute);
+* **Purpose:** Stores information about specific league seasons.
+* **Populated by:** `scripts/sync_leagues.py` (extracts `currentseason` data)
+* **Schema:**
+    ```sql
+    CREATE TABLE IF NOT EXISTS seasons (
+        season_id INTEGER PRIMARY KEY,          -- From SportMonks API 'id'
+        league_id INTEGER NOT NULL,             -- From SportMonks API 'league_id'
+        league_name TEXT,                       -- Added for context (can be derived)
+        sport_id INTEGER,                       -- From SportMonks API 'sport_id'
+        name TEXT NOT NULL,                     -- From SportMonks API 'name'
+        is_current BOOLEAN DEFAULT 0,           -- From SportMonks API 'is_current'
+        finished BOOLEAN DEFAULT 0,             -- From SportMonks API 'finished' (Added)
+        pending BOOLEAN DEFAULT 0,              -- From SportMonks API 'pending' (Added)
+        starting_at TEXT,                       -- From SportMonks API 'starting_at' (Added)
+        ending_at TEXT,                         -- From SportMonks API 'ending_at' (Added)
+        standings_recalculated_at TEXT,         -- From SportMonks API 'standings_recalculated_at' (Added)
+        -- Database internal tracking timestamps
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    ```
 
-## Table explain
+**3. `teams` Table (Implemented)**
 
+* **Purpose:** Stores information about football teams/clubs.
+* **Populated by:** `scripts/sync_teams.py`
+* **Schema:**
+    ```sql
+     CREATE TABLE IF NOT EXISTS teams (
+        team_id INTEGER PRIMARY KEY,            -- From SportMonks API 'id'
+        name TEXT NOT NULL,                     -- From SportMonks API 'name'
+        short_code TEXT,                        -- From SportMonks API 'short_code' (Added)
+        country_id INTEGER,                     -- From SportMonks API 'country_id'
+        logo_url TEXT,                          -- From SportMonks API 'image_path'
+        venue_id INTEGER,                       -- From SportMonks API 'venue_id' (Added)
+        founded INTEGER,                        -- From SportMonks API 'founded' (Added)
+        type TEXT,                              -- From SportMonks API 'type' (Added)
+        national_team BOOLEAN DEFAULT 0,        -- From SportMonks API 'national_team' (Added)
+        -- Database internal tracking timestamps
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    ```
 
-### leagues
+**4. `schedules` Table (Implemented)**
 
-This table stores basic information about football leagues (Premier League, La Liga, etc.). It's a foundational table that other tables will reference.
+* **Purpose:** Stores core details about individual fixtures (matches), including schedule context (round, season) and basic results. This table effectively replaces the originally planned `fixtures` table by incorporating essential match data obtained from the `/schedules/seasons/{id}` endpoint.
+* **Populated by:** `scripts/sync_schedules.py`
+* **Schema:**
+    ```sql
+     CREATE TABLE IF NOT EXISTS schedules (
+        fixture_id INTEGER PRIMARY KEY,     -- Unique ID for the match (From fixture data)
+        season_id INTEGER NOT NULL,         -- ID of the season (From round data)
+        league_id INTEGER,                  -- ID of the league (From fixture data)
+        round_id INTEGER,                   -- ID of the round (From round data)
+        home_team_id INTEGER NOT NULL,      -- ID of the home team (From fixture participants)
+        away_team_id INTEGER NOT NULL,      -- ID of the away team (From fixture participants)
+        start_time TEXT NOT NULL,           -- Match start time (From fixture 'starting_at')
+        status TEXT,                        -- Match status (Mapped from fixture 'state_id')
+        home_score INTEGER,                 -- Final home score (From fixture scores)
+        away_score INTEGER,                 -- Final away score (From fixture scores)
+        result TEXT,                        -- Standardized result ('H', 'D', 'A', NULL) (Derived)
+        result_info TEXT,                   -- Raw result description from API (From fixture 'result_info')
+        round_finished BOOLEAN,             -- Status of the round (From round data)
+        -- Database internal tracking timestamps
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        -- Optional Foreign Keys (can be added later)
+        -- FOREIGN KEY (season_id) REFERENCES seasons(season_id),
+        -- FOREIGN KEY (league_id) REFERENCES leagues(league_id),
+        -- FOREIGN KEY (home_team_id) REFERENCES teams(team_id),
+        -- FOREIGN KEY (away_team_id) REFERENCES teams(team_id)
+    );
+    ```
 
-### teams
+**5. `fixture_stats` Table (Implemented)**
 
-Stores information about the football clubs participating in the leagues. Both home and away teams in fixtures will reference this table.
+* **Purpose:** Stores detailed match statistics for each team, per period (e.g., first half, second half). Uses a wide format with many columns for different stats.
+* **Populated by:** `scripts/sync_fixture_stats.py`
+* **Schema:**
+    ```sql
+    CREATE TABLE IF NOT EXISTS fixture_stats (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,   -- Internal DB ID
+        fixture_id INTEGER NOT NULL,            -- Links to schedules.fixture_id
+        team_id INTEGER NOT NULL,               -- participant_id from API stat item
+        period TEXT NOT NULL,                   -- e.g., 'first_half', 'second_half' (Mapped from period description)
 
-### seasons
+        -- Statistic columns (using underscore convention)
+        goals INTEGER DEFAULT 0,
+        shots_on_target INTEGER DEFAULT 0,
+        shots_off_target INTEGER DEFAULT 0,
+        ball_possession REAL DEFAULT NULL,
+        corners INTEGER DEFAULT 0,
+        fouls INTEGER DEFAULT 0,
+        yellow_cards INTEGER DEFAULT 0,
+        red_cards INTEGER DEFAULT 0,
+        shots_total INTEGER DEFAULT 0,
+        shots_blocked INTEGER DEFAULT 0,
+        offsides INTEGER DEFAULT 0,
+        saves INTEGER DEFAULT 0,
+        hit_woodwork INTEGER DEFAULT 0,
+        shots_insidebox INTEGER DEFAULT 0,
+        successful_dribbles INTEGER DEFAULT 0,
+        successful_dribbles_percentage REAL DEFAULT NULL,
+        successful_passes INTEGER DEFAULT 0,
+        successful_passes_percentage REAL DEFAULT NULL,
+        shots_outsidebox INTEGER DEFAULT 0,
+        dribble_attempts INTEGER DEFAULT 0,
+        throwins INTEGER DEFAULT 0,
+        assists INTEGER DEFAULT 0,
+        accurate_crosses INTEGER DEFAULT 0,
+        total_crosses INTEGER DEFAULT 0,
+        penalties INTEGER DEFAULT 0,
+        passes INTEGER DEFAULT 0,
+        attacks INTEGER DEFAULT 0,
+        challenges INTEGER DEFAULT 0,
+        tackles INTEGER DEFAULT 0,
+        interceptions INTEGER DEFAULT 0,
+        long_passes INTEGER DEFAULT 0,
+        goal_kicks INTEGER DEFAULT 0,
+        key_passes INTEGER DEFAULT 0,
+        dangerous_attacks INTEGER DEFAULT 0,
+        substitutions INTEGER DEFAULT 0,
 
-Each league has multiple seasons (2022/2023, 2023/2024, etc.). This table helps organize fixtures by their respective seasons.
+        -- Timestamps
+        timestamp DATETIME,                     -- Timestamp when the stat was fetched/processed
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-### fixtures (central table)
+        -- Constraints
+        UNIQUE (fixture_id, team_id, period),    -- Prevent duplicate stat entries for the same team/period
+        FOREIGN KEY (fixture_id) REFERENCES schedules(fixture_id) -- Link to schedules table
+    );
+    ```
 
-This is the core table that represents individual matches. It connects to leagues, seasons, and teams, and stores basic match information like scores and status.
+**6. `fixture_odds` Table (Planned - Not Yet Implemented)**
 
-### fixture_odds
+* **Purpose:** Stores pre-match and in-play betting odds from various bookmakers for fixtures.
+* **Populated by:** Future `scripts/sync_odds.py` (requires implementation)
+* **Schema (Planned):**
+    ```sql
+    CREATE TABLE IF NOT EXISTS fixture_odds (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        fixture_id INTEGER NOT NULL,            -- Links to schedules.fixture_id
+        bookmaker_id INTEGER,
+        bookmaker_name TEXT,
+        market_type TEXT NOT NULL,              -- e.g., '1x2', 'over_under', 'asian_handicap'
+        timestamp DATETIME NOT NULL,            -- Timestamp of the odds snapshot
+        stage TEXT NOT NULL,                    -- 'pre_match' or 'in_play'
+        -- Common Market Odds (add more as needed)
+        home_odds REAL,
+        draw_odds REAL,
+        away_odds REAL,
+        over_under_value REAL,                  -- e.g., 2.5 for O/U 2.5 goals
+        over_odds REAL,
+        under_odds REAL,
+        -- Add columns for other markets (Handicap, Correct Score, etc.) if required
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        -- updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Trigger can be added later
+        FOREIGN KEY (fixture_id) REFERENCES schedules(fixture_id)
+    );
+    ```
 
-Stores both pre-match and in-play odds from various bookmakers. The `stage` field distinguishes between pre-match and in-play odds, while `market_type` identifies different betting markets (1X2, over/under, etc.).
+**7. `fixture_timeline` Table (Planned - Not Yet Implemented)**
 
-### fixture_stats
+* **Purpose:** Stores minute-by-minute timeline data, potentially including events, ball coordinates, or pressure indices if available from the API.
+* **Populated by:** Future `scripts/sync_events.py` or similar (requires implementation)
+* **Schema (Planned):**
+    ```sql
+    CREATE TABLE IF NOT EXISTS fixture_timeline (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        fixture_id INTEGER NOT NULL,            -- Links to schedules.fixture_id
+        minute INTEGER NOT NULL,                -- Minute of the event/data point
+        second INTEGER,                         -- Optional: Second within the minute
+        event_type TEXT,                        -- e.g., 'goal', 'card', 'substitution', 'ball_position'
+        team_id INTEGER,                        -- Team associated with the event (if applicable)
+        player_id INTEGER,                      -- Player associated with the event (if applicable)
+        -- Potential Data Points (adjust based on available API data)
+        ball_x REAL,                            -- Ball x coordinate
+        ball_y REAL,                            -- Ball y coordinate
+        home_pressure_index REAL,               -- Example pressure index
+        away_pressure_index REAL,               -- Example pressure index
+        event_details TEXT,                     -- JSON or Text description of the event
+        timestamp DATETIME NOT NULL,            -- Timestamp of the event/data point
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        -- updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Trigger can be added later
+        FOREIGN KEY (fixture_id) REFERENCES schedules(fixture_id)
+        -- Optional: FOREIGN KEY (team_id) REFERENCES teams(team_id)
+        -- Optional: FOREIGN KEY (player_id) REFERENCES players(player_id) -- If players table exists
+    );
+    ```
 
-Captures match statistics for each team, separated by period (first half or full match). This design makes it easy to compare first-half stats with full-match stats.
+**Note:** The `schedules` table serves as the central point for fixture information. `fixture_stats`, `fixture_odds`, and `fixture_timeline` link to it via `fixture_id`. Implementation for `fixture_odds` and `fixture_timeline` is planned for the future.
 
-### fixture_timeline
+## Schema Usage for Prediction Modelling
 
-Stores minute-by-minute data like ball coordinates and pressure indices. This granular data will be valuable for your prediction model.
+With the implemented schema, you can gather features for prediction models:
 
-## How to use this Schema for Prediction modelling
-
-### Prematch prediction
+**Example: Gathering Pre-match and Post-match Data**
 
 ```sql
--- Example query to gather pre-match features
-SELECT f.fixture_id, f.home_team_id, f.away_team_id,
-       ho.home_odds, ho.draw_odds, ho.away_odds,
-       -- Add historical team performance metrics
-FROM fixtures f
-JOIN fixture_odds ho ON f.fixture_id = ho.fixture_id
-WHERE ho.stage = 'pre_match'
-AND ho.market_type = '1x2' 
--- Get the odds closest to kick-off
-AND ho.timestamp = (
-    SELECT MAX(timestamp) 
-    FROM fixture_odds 
-    WHERE fixture_id = f.fixture_id AND stage = 'pre_match'
-)
-```
+-- Select basic fixture info and team stats for finished matches
+SELECT
+    s.fixture_id,
+    s.season_id,
+    s.league_id,
+    s.start_time,
+    s.home_team_id,
+    s.away_team_id,
+    s.home_score,
+    s.away_score,
+    s.result,
+    -- Home Team Stats (Full Match)
+    fs_home.goals AS home_goals_full,
+    fs_home.shots_total AS home_shots_full,
+    fs_home.shots_on_target AS home_sot_full,
+    fs_home.ball_possession AS home_possession_full,
+    fs_home.corners AS home_corners_full,
+    fs_home.fouls AS home_fouls_full,
+    -- Away Team Stats (Full Match)
+    fs_away.goals AS away_goals_full,
+    fs_away.shots_total AS away_shots_full,
+    fs_away.shots_on_target AS away_sot_full,
+    fs_away.ball_possession AS away_possession_full,
+    fs_away.corners AS away_corners_full,
+    fs_away.fouls AS away_fouls_full
+    -- Add more stats as needed...
+FROM
+    schedules s
+LEFT JOIN
+    fixture_stats fs_home ON s.fixture_id = fs_home.fixture_id
+                         AND s.home_team_id = fs_home.team_id
+                         AND fs_home.period = 'second_half' -- Assuming 'second_half' contains full match stats
+LEFT JOIN
+    fixture_stats fs_away ON s.fixture_id = fs_away.fixture_id
+                         AND s.away_team_id = fs_away.team_id
+                         AND fs_away.period = 'second_half' -- Assuming 'second_half' contains full match stats
+WHERE
+    s.status = 'FT'; -- Or other finished statuses like 'AET', 'FT_PEN'
 
-### In-play prediction 
-
-```sql
--- Example query to gather pre-match features
-SELECT f.fixture_id, f.home_team_id, f.away_team_id,
-       ho.home_odds, ho.draw_odds, ho.away_odds,
-       -- Add historical team performance metrics
-FROM fixtures f
-JOIN fixture_odds ho ON f.fixture_id = ho.fixture_id
-WHERE ho.stage = 'pre_match'
-AND ho.market_type = '1x2' 
--- Get the odds closest to kick-off
-AND ho.timestamp = (
-    SELECT MAX(timestamp) 
-    FROM fixture_odds 
-    WHERE fixture_id = f.fixture_id AND stage = 'pre_match'
-)
-```
-
-## Implementation suggestion
-
-- **Data Integration:**
-    - Use your existing `EndpointHandler` class to fetch data from various SportMonks endpoints
-    - Create a data processing module to transform API responses into the database schema format
-- **Schema Creation:**
-    - Add a file `src/data/schema.py` with the schema definitions
-    - Create a script to initialize the database with this schema
-- **Incremental Updates:**
-    - Design your data pipeline to only fetch and store new or updated data
-    - Use the `updated_at` fields to track changes
+Note: The fixture_stats table might contain stats for different periods (first_half, second_half, potentially extra_time). 
+You need to select the appropriate period based on whether you need half-time or full-time stats. 
+Verify if SportMonks provides cumulative stats in the 'second_half' period or if aggregation is needed. 
+Once fixture_odds is implemented, it can be joined to get pre-match odds features.Data Storage StrategySchema Definition: Defined directly in create_<resource>_table functions within src/data/storage.py.
+Data Insertion:store_data function (generic): Uses INSERT OR REPLACE based on the primary key. Suitable for leagues, seasons, teams, schedules.store_fixture_stats_long function: 
+Uses INSERT OR IGNORE due to the UNIQUE (fixture_id, team_id, period) constraint for fixture_stats.

@@ -1,60 +1,74 @@
-# Football Data Implementation Plan
+# Updated Football Data Implementation Plan (Reflecting Current State & Plans)
 
-As your tech lead, here's a structured approach to complete your project, focusing on the specific data needed for your prediction model:
+This document outlines the implementation plan and current status of the SportMonks football data retrieval project, updated to reflect the actual code structure, workflow, and planned future features.
 
 ## Phase 1: API Endpoints & Data Requirements
 
-First, let's identify the exact Sportmonks API endpoints needed for your prediction model:
+The project utilizes or plans to utilize the following SportMonks API v3 endpoints:
 
-1. **Core Endpoints**:
-    
-    - `/v3/football/leagues` - Already implemented
-    - `/v3/football/seasons` - For season information
-    - `/v3/football/fixtures` - Core match data
-    - `/v3/football/fixtures/{id}` - Detailed fixture information
-2. **Specialized Data Endpoints**:
-    
-    - `/v3/football/fixtures/{id}?include=odds` - Pre-match and in-play odds
-    - `/v3/football/fixtures/{id}?include=statistics` - Team statistics (shots, possession)
-    - `/v3/football/fixtures/{id}?include=events` - Timeline of match events
-    - `/v3/football/livescores/inplay` - For collecting real-time data
-3. **Required Include Parameters**:
-    
-    - `participants` - Team information
-    - `scores` - Match scores
-    - `statistics.periods` - Stats broken down by period (first half, full match)
-    - `events.coordinates` - For ball position data
-    - `odds.bookmaker.markets` - For pre-match and in-play odds
+**1. Implemented Endpoints:**
+* `/v3/football/leagues?include=currentSeason`: Fetches league data along with details of the current season. (Used by `scripts/sync_leagues.py`)
+* `/v3/football/teams`: Fetches team data. (Used by `scripts/sync_teams.py`)
+* `/v3/football/schedules/seasons/{id}`: Fetches the full schedule (including fixture details) for a specific season. (Used by `scripts/sync_schedules.py` - *Primary source for fixture info*)
+* `/v3/football/fixtures/{id}?include=periods.statistics.type`: Fetches detailed fixture statistics broken down by period. (Used by `scripts/sync_fixture_stats.py` for finished fixtures)
 
-## Phase 2: Implementation Steps
+**2. Planned Endpoints (Not Yet Implemented):**
+* `/v3/football/fixtures/{id}?include=odds`: To fetch pre-match and in-play odds. (Needed for `fixture_odds` table)
+* `/v3/football/fixtures/{id}?include=events`: To fetch timeline/event data. (Needed for `fixture_timeline` table)
+* *(Potentially)* `/v3/football/livescores/inplay`: For collecting real-time data if needed in the future.
 
-### Step 1: Core Modules Setup (2-3 days)
-1.  Refine `src/api/client.py` and `src.api.endpoints.py` (`EndpointHandler`).
-2.  Set up `src/config.py`.
-3.  Implement core database connection and table creation logic in `src/data/storage.py`.
-4.  Define initial database schema in `Database planning.txt` and potentially a setup script or within `storage.py`. [cite: 11, 15, 16, 17, 19, 21, 23]
+**3. Endpoints Currently NOT Used:**
+* `/v3/football/fixtures` (Directly fetching all fixtures)
+* `/v3/football/seasons` (Directly fetching all seasons)
 
-### Step 2: Implement Sync Scripts (Iterative, 1-2 days per resource)
-For each required resource (Leagues, Seasons, Teams, Fixtures, Odds, Stats, etc.):
-1.  **Create Processing Function:** Add a specific `process_<resource>_data` function in `src/data/processors.py` to transform the raw API JSON for that resource into a list of dictionaries matching the database schema.
-2.  **Create Sync Script:** Create `scripts/sync_<resource>.py` (e.g., `sync_leagues.py`, `sync_seasons.py`).
-    * This script will use `EndpointHandler` to fetch all data for the resource's endpoint.
-    * It will call the corresponding `process_<resource>_data` function.
-    * It will call database functions from `src/data/storage.py` (like `create_<resource>_table` if needed, and `store_data`) to save the processed data into the correct SQLite table.
-3.  **Refine Database Schema/Storage:** Update `src/data/storage.py` with table creation logic for the new resource and adjust `store_data` if specific handling is needed. Update `Database planning.txt`.
+**4. Key Include Parameters Used/Planned:**
+* `currentSeason` (with `/leagues`) - *Implemented*
+* `periods.statistics.type` (with `/fixtures/{id}`) - *Implemented*
+* `odds` (with `/fixtures/{id}`) - *Planned*
+* `events` (with `/fixtures/{id}`) - *Planned*
 
-### Step 3: Implement Supporting Logic (Ongoing)
-1.  **Error Handling:** Enhance error handling within sync scripts, processors, and storage functions.
-2.  **Logging:** Add proper logging throughout the process.
-3.  **Incremental Updates:** (Advanced) Modify sync scripts and storage logic to handle fetching/storing only new or updated records based on timestamps or API parameters, if feasible.
-4.  **Scheduling/Orchestration:** (Optional) Use OS tools (cron) or Python libraries (schedule) to run sync scripts automatically.
+## Phase 2: Implementation Steps & Current Status
 
-### Step 4: Testing & Validation (Ongoing)
-1.  Test each sync script individually.
-2.  Verify data integrity in the SQLite database after each sync.
-3.  Run sample queries (like those in `Database planning.txt`) to ensure data is suitable for the prediction model.
+The project follows a modular structure with sync scripts coordinating the fetch-process-store workflow.
 
-## Immediate Next Steps
-1.  Refactor `sync_leagues.py` as described above, moving logic to `src/data/processors.py` and `src/data/storage.py`.
-2.  Update `README.md` to reflect this sync script pattern.
-3.  Begin implementing the sync script for the next required resource (e.g., `sync_seasons.py`).
+### Step 1: Core Modules Setup (Completed)
+* **`src/config.py`:** Configuration set up.
+* **`src/api/client.py`:** `APIClient` implemented.
+* **`src/api/endpoints.py`:** `EndpointHandler` implemented.
+* **`src/data/storage.py`:** DB connection, table creation (for implemented tables), data storage logic, and triggers implemented.
+* **`src/data/processors.py`:** Processing functions for implemented data types (leagues, seasons, teams, schedules, stats) implemented.
+
+### Step 2: Implement Sync Scripts (Partially Completed)
+* **`scripts/sync_leagues.py` (Implemented):** Fetches/processes/stores leagues and current seasons.
+* **`scripts/sync_teams.py` (Implemented):** Fetches/processes/stores teams.
+* **`scripts/sync_schedules.py` (Implemented):** Fetches/processes/stores detailed fixture info per season into the `schedules` table.
+* **`scripts/sync_fixture_stats.py` (Implemented):** Fetches/processes/stores detailed stats for finished fixtures.
+* **`scripts/sync_odds.py` (Planned):** Script needed to fetch odds data using the planned endpoint and store it in `fixture_odds`.
+* **`scripts/sync_events.py` (Planned):** Script needed to fetch event/timeline data using the planned endpoint and store it in `fixture_timeline`.
+
+### Step 3: Implement Supporting Logic (Partially Implemented)
+* **Error Handling:** Basic implementation exists.
+* **Logging:** Basic implementation exists (mostly `print` statements).
+* **Incremental Updates:** Partially implemented for stats. Other scripts use `INSERT OR REPLACE`. Fetching efficiency can be improved.
+* **Raw Data Storage:** Implemented.
+* **Scheduling/Orchestration:** Not implemented.
+
+### Step 4: Testing & Validation (Manual/Ad-hoc)
+* Individual script execution and manual DB checks are possible. Formal testing is not implemented.
+
+## Potential Next Steps / Future Enhancements
+
+1.  **Implement Odds Sync (High Priority based on Plan):**
+    * Define the `fixture_odds` table schema in `src/data/storage.py` (use the planned schema).
+    * Create `process_odds_data` function in `src/data/processors.py`.
+    * Create `scripts/sync_odds.py` to fetch from `/fixtures/{id}?include=odds` (decide which fixtures: upcoming, recent?) and store data.
+2.  **Implement Timeline/Events Sync (High Priority based on Plan):**
+    * Define the `fixture_timeline` table schema in `src/data/storage.py` (use the planned schema).
+    * Create `process_timeline_data` function in `src/data/processors.py`.
+    * Create `scripts/sync_events.py` to fetch from `/fixtures/{id}?include=events` and store data.
+3.  **Refine Incremental Updates:** Explore API filters for more efficient fetching.
+4.  **Enhance Logging:** Standardize using the `logging` library.
+5.  **Add Data Validation:** Implement checks within processors (e.g., Pydantic).
+6.  **Improve Error Handling:** Add more specific handling and reporting.
+7.  **Automated Testing:** Implement unit and integration tests.
+8.  **Orchestration:** Integrate with a scheduling tool.
