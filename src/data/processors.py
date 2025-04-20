@@ -5,6 +5,20 @@ import logging
 # Configure basic logging if not done elsewhere
 # logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+# --- Helper Function for Safe Type Conversion ---
+def safe_convert(value, target_type, default=None):
+    """Attempts to convert a value to a target type, returning default on failure."""
+    if value is None:
+        return default
+    try:
+        # Handle percentage strings for floats
+        if target_type is float and isinstance(value, str) and '%' in value:
+            return float(value.replace('%', '').strip())
+        return target_type(value)
+    except (ValueError, TypeError):
+        # logging.debug(f"Could not convert '{value}' ({type(value).__name__}) to {target_type.__name__}. Returning default.")
+        return default
+
 # --- Existing Processors ---
 def process_league_data(raw_league_data):
     """Transforms raw league API data for database insertion."""
@@ -457,22 +471,10 @@ def process_fixture_stats_long(raw_fixture_data):
                         row[db_column] = None # Keep None if API value is None
                         continue
 
-                    # Attempt safe type conversion
-                    if target_type:
-                        try:
-                            # Specific handling for boolean-like stats if needed
-                            # E.g., if API sends 1/0 for a boolean field mapped to INTEGER
-                            # if target_type is bool and db_column == 'some_bool_column':
-                            #     row[db_column] = bool(int(raw_value)) # Example
-                            # else:
-                            row[db_column] = target_type(raw_value)
-                        except (ValueError, TypeError) as conv_err:
-                            logging.warning(f"Could not convert value '{raw_value}' ({type(raw_value).__name__}) to type {target_type.__name__} for {db_column} (API code: {api_code}) in fixture {fixture_id}, team {team_id}, period {period_desc}. Error: {conv_err}. Setting to NULL.")
-                            row[db_column] = None # Set to None on conversion error
-                    else:
-                        # Should not happen if DB_COLUMN_TYPES is comprehensive
-                        row[db_column] = raw_value
-                        logging.warning(f"No target type defined in DB_COLUMN_TYPES for column '{db_column}'. Storing raw value.")
+                    # Attempt safe type conversion using the helper function
+                    row[db_column] = safe_convert(raw_value, target_type, default=None)
+                    if row[db_column] is None and raw_value is not None: # Log if conversion failed but raw value wasn't None
+                         logging.warning(f"Conversion failed for value '{raw_value}' ({type(raw_value).__name__}) to type {target_type.__name__} for {db_column} (API code: {api_code}) in fixture {fixture_id}, team {team_id}, period {period_desc}. Storing NULL.")
 
 
             processed_rows.append(row)
@@ -486,9 +488,61 @@ def process_fixture_stats_long(raw_fixture_data):
     return processed_rows
 
 
+# --- NEW: Pre-Match Odds Processor ---
+def process_prematch_odds_data(raw_odds_data):
+    """
+    Processes the raw response from the /odds/pre-match/fixtures/{id} endpoint
+    into a list of dictionaries suitable for the fixture_odds table.
+    """
+    processed_odds = []
+    if not raw_odds_data or 'data' not in raw_odds_data:
+        logging.warning("Invalid or empty odds data received for processing.")
+        return processed_odds
+
+    # The 'data' key should contain a list of odds objects
+    odds_list = raw_odds_data['data']
+    if not isinstance(odds_list, list):
+        logging.warning("Odds data is not a list as expected.")
+        return processed_odds
+
+    for odd_item in odds_list:
+        if not isinstance(odd_item, dict):
+            logging.warning(f"Skipping invalid odd item (not a dict): {odd_item}")
+            continue
+
+        # Extract required fields, performing safe type conversions
+        fixture_id = odd_item.get("fixture_id")
+        market_id = odd_item.get("market_id")
+        bookmaker_id = odd_item.get("bookmaker_id")
+        label = odd_item.get("label")
+
+        # Basic validation: need these keys for the unique constraint
+        if not all([fixture_id, market_id, bookmaker_id, label]):
+             logging.warning(f"Skipping odd item due to missing key fields (fixture_id, market_id, bookmaker_id, label): {odd_item}")
+             continue
+
+        processed_item = {
+            "fixture_id": fixture_id,
+            "market_id": market_id,
+            "bookmaker_id": bookmaker_id,
+            "label": label,
+            "name": odd_item.get("name"), # Optional
+            "market_description": odd_item.get("market_description"), # Optional
+            "value": safe_convert(odd_item.get("value"), float),
+            "probability": safe_convert(odd_item.get("probability"), float), # Handles "54.64%"
+            "handicap": safe_convert(odd_item.get("handicap"), float) # Can be None, 0.0, -0.25 etc.
+        }
+
+        processed_odds.append(processed_item)
+
+    logging.info(f"Processed {len(processed_odds)} pre-match odd entries.")
+    return processed_odds
+# --- End of NEW Processor ---
+
+
 # --- Placeholder functions for future implementation ---
 # def process_fixture_details(raw_fixture_data): ... # To update main fixtures table
-# def process_odds_data(raw_odds_data, fixture_id): ...
+# def process_odds_data(raw_odds_data, fixture_id): ... # Could be split pre-match/in-play
 # def process_timeline_data(raw_event_data, fixture_id): ...
 
 # --- Deprecated simple processor ---

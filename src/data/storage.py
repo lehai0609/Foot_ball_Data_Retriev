@@ -235,34 +235,81 @@ def create_fixture_stats_table(conn):
     else:
         logging.error("Failed to ensure fixture_stats table.")
 
+# --- NEW: Fixture Odds Table ---
+def create_fixture_odds_table(conn):
+    """
+    Creates the fixture_odds table to store pre-match odds.
+    Uses a UNIQUE constraint to prevent duplicate odds entries for the
+    same fixture, market, bookmaker, label, and handicap.
+    """
+    sql = """
+    CREATE TABLE IF NOT EXISTS fixture_odds (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, -- Internal DB ID
+        fixture_id INTEGER NOT NULL,          -- Links to schedules.fixture_id
+        market_id INTEGER NOT NULL,           -- From SportMonks API 'market_id'
+        bookmaker_id INTEGER NOT NULL,        -- From SportMonks API 'bookmaker_id'
+        label TEXT NOT NULL,                  -- From SportMonks API 'label' (e.g., 'Home', 'Away', 'Over', 'Under')
+        name TEXT,                            -- From SportMonks API 'name' (e.g., 'Home', 'Away', 'Over 2.5')
+        market_description TEXT,              -- From SportMonks API 'market_description' (e.g., 'Match Result', 'Asian Handicap')
+        value REAL,                           -- From SportMonks API 'value' (e.g., 1.83, 2.5), converted to REAL
+        probability REAL,                     -- From SportMonks API 'probability' (e.g., 54.64), converted to REAL
+        handicap REAL,                        -- From SportMonks API 'handicap' (e.g., -0.25), converted to REAL
+        -- Timestamps
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+        -- Constraints
+        UNIQUE (fixture_id, market_id, bookmaker_id, label, handicap) -- Prevent duplicates for the same specific odd
+        -- Optional: Add FOREIGN KEY constraints later if needed
+        -- FOREIGN KEY (fixture_id) REFERENCES schedules(fixture_id)
+    );"""
+    if create_table(conn, sql):
+        logging.info("Fixture_Odds table ensured.")
+    else:
+        logging.error("Failed to ensure fixture_odds table.")
+# --- End of NEW function ---
+
+
 # --- Data Storage ---
 
-def store_data(conn, table_name, data_list, primary_key_column="id"):
+def store_data(conn, table_name, data_list, primary_key_column="id", use_insert_ignore=False):
     """
-    Generic function to insert/replace data into a specified table using a single primary key.
+    Generic function to insert/replace or insert/ignore data into a specified table.
     Assumes data_list is a list of dictionaries where keys match column names.
-    Uses INSERT OR REPLACE.
+
+    Args:
+        conn: Database connection object.
+        table_name (str): Name of the table to insert into.
+        data_list (list): List of dictionaries representing rows.
+        primary_key_column (str): Name of the primary key column (used for logging/counting).
+                                   Not directly used for INSERT OR IGNORE logic.
+        use_insert_ignore (bool): If True, use INSERT OR IGNORE. Otherwise, use INSERT OR REPLACE.
     """
-    # Based on original storage.py
     if not data_list:
-        logging.warning(f"No processed data provided for table {table_name}.") # Use logging
+        logging.warning(f"No processed data provided for table {table_name}.")
         return 0
 
     cursor = conn.cursor()
     inserted_count = 0
-    replaced_count = 0
+    replaced_count = 0 # Only relevant for INSERT OR REPLACE
+    ignored_count = 0  # Only relevant for INSERT OR IGNORE
     skipped_count = 0
 
     # Find the first valid item to determine columns
     first_valid_item = next((item for item in data_list if item and isinstance(item, dict)), None)
     if not first_valid_item:
-        logging.warning(f"No valid data items (dictionaries) found for table {table_name}.") # Use logging
+        logging.warning(f"No valid data items (dictionaries) found for table {table_name}.")
         if cursor: cursor.close()
         return 0
 
     columns = list(first_valid_item.keys())
+    # Exclude auto-increment primary key 'id' if it exists and we are inserting
+    if 'id' in columns and (use_insert_ignore or table_name == "fixture_odds"): # Exclude for odds table too
+        columns.remove('id')
+
     placeholders = ', '.join(['?' for _ in columns])
-    sql = f"INSERT OR REPLACE INTO {table_name} ({', '.join(columns)}) VALUES ({placeholders});"
+    insert_mode = "INSERT OR IGNORE" if use_insert_ignore else "INSERT OR REPLACE"
+    sql = f"{insert_mode} INTO {table_name} ({', '.join(columns)}) VALUES ({placeholders});"
 
     item_for_error = None # Store sample item for error reporting
     try:
@@ -276,41 +323,34 @@ def store_data(conn, table_name, data_list, primary_key_column="id"):
             # Handle potential missing keys in some items gracefully
             values = [item.get(col) for col in columns]
 
-            # Check if the record exists (for counting purposes)
-            pk_value = item.get(primary_key_column)
-            exists = False
-            if pk_value is not None:
-                 try:
-                     # Use parameterized query for existence check
-                     cursor.execute(f"SELECT 1 FROM {table_name} WHERE {primary_key_column} = ? LIMIT 1", (pk_value,))
-                     exists = cursor.fetchone() is not None
-                 except sqlite3.Error as check_e:
-                     # Log warning but continue trying to insert/replace
-                     logging.warning(f"Could not check existence for PK '{pk_value}' in {table_name}: {check_e}")
-
-            # Execute the INSERT OR REPLACE statement
+            # Execute the INSERT statement
             cursor.execute(sql, values)
 
-            # Update counts based on existence check *before* the operation
-            if exists:
-                replaced_count += 1
-            else:
-                # Note: INSERT OR REPLACE might replace even if exists=False if PK was NULL
-                # but this gives a reasonable estimate. A more precise count might
-                # require checking changes() after execution, but that's more complex.
-                inserted_count += 1
+            # Update counts based on rowcount
+            if cursor.rowcount > 0:
+                # How to differentiate insert vs replace for INSERT OR REPLACE is tricky without extra queries.
+                # For INSERT OR IGNORE, rowcount > 0 means inserted.
+                # For INSERT OR REPLACE, rowcount > 0 means inserted or replaced.
+                # We'll simplify the counting for now.
+                inserted_count += 1 # Count successful operations (insert or replace/ignore)
+            elif use_insert_ignore:
+                 ignored_count += 1 # rowcount is 0 for IGNORE
 
         conn.commit()
-        logging.info(f"Successfully stored data into {table_name}. Inserted (approx): {inserted_count}, Replaced/Updated (approx): {replaced_count}, Skipped: {skipped_count}") # Use logging
-        return inserted_count + replaced_count # Return total affected rows
+        if use_insert_ignore:
+             logging.info(f"Successfully stored data into {table_name} using INSERT OR IGNORE. Inserted: {inserted_count}, Ignored (duplicates/skipped): {ignored_count + skipped_count}")
+        else:
+             # For INSERT OR REPLACE, inserted_count represents the total number of rows affected (inserted or replaced)
+             logging.info(f"Successfully stored data into {table_name} using INSERT OR REPLACE. Affected rows: {inserted_count}, Skipped: {skipped_count}")
+        return inserted_count # Return total affected/inserted rows
     except sqlite3.Error as e:
-        logging.error(f"Database error during storage in {table_name}: {e}") # Use logging
+        logging.error(f"Database error during storage in {table_name} ({insert_mode}): {e}") # Use logging
         logging.error(f"SQL attempted: {sql}")
         logging.error(f"Item causing error (potentially): {item_for_error}")
         # Check for common errors like missing columns in the item
         if "has no column named" in str(e):
              logging.error(f"Possible cause: Item dictionary might be missing expected keys matching table columns.")
-             logging.error(f"Expected columns based on first item: {columns}")
+             logging.error(f"Expected columns based on first item (excluding 'id' if applicable): {columns}")
         conn.rollback()
         return 0
     finally:
@@ -325,57 +365,8 @@ def store_fixture_stats_long(conn, stats_rows):
     Stores processed fixture statistics rows (long format) into the fixture_stats table.
     Uses INSERT OR IGNORE to handle the UNIQUE constraint on (fixture_id, team_id, period).
     """
-    if not stats_rows:
-        logging.warning("No processed fixture stats provided to store.")
-        return 0
-
-    cursor = conn.cursor()
-    inserted_count = 0
-    ignored_count = 0
-    skipped_count = 0
-    table_name = "fixture_stats"
-
-    # Get columns from the first valid item, excluding the auto-increment 'id'
-    first_valid_item = next((item for item in stats_rows if item and isinstance(item, dict)), None)
-    if not first_valid_item:
-        logging.warning(f"No valid data items (dictionaries) found for table {table_name}.")
-        if cursor: cursor.close()
-        return 0
-
-    # Exclude 'id' if it exists, as it's auto-incremented
-    columns = [col for col in first_valid_item.keys() if col != 'id']
-    placeholders = ', '.join(['?' for _ in columns])
-    sql = f"INSERT OR IGNORE INTO {table_name} ({', '.join(columns)}) VALUES ({placeholders});"
-
-    row_for_error = None # Store sample row for error reporting
-    try:
-        for row in stats_rows:
-            row_for_error = row # Keep track of the last processed row
-            if not row or not isinstance(row, dict):
-                skipped_count += 1
-                continue
-
-            # Prepare values in the correct order corresponding to columns
-            values = [row.get(col) for col in columns]
-
-            cursor.execute(sql, values)
-            if cursor.rowcount > 0:
-                inserted_count += 1
-            else:
-                ignored_count += 1 # Row was ignored, likely due to UNIQUE constraint violation
-
-        conn.commit()
-        logging.info(f"Successfully processed storage for {table_name}. Inserted: {inserted_count}, Ignored (duplicates/invalid): {ignored_count + skipped_count}")
-        return inserted_count
-    except sqlite3.Error as e:
-        logging.error(f"Database error during storage in {table_name}: {e}")
-        logging.error(f"SQL attempted: {sql}")
-        logging.error(f"Sample row causing error (potentially): {row_for_error}")
-        conn.rollback()
-        return 0
-    finally:
-        if cursor:
-            cursor.close()
+    # Use the generic store_data function with use_insert_ignore=True
+    return store_data(conn, "fixture_stats", stats_rows, primary_key_column="id", use_insert_ignore=True)
 
 
 # --- Triggers ---
