@@ -24,7 +24,7 @@ This project aims to develop a machine learning model that predicts whether the 
   - Fixture basic information (schedules table)
   - Half-time statistics (fixture_stats table)
   - Pre-match odds (fixture_odds table)
-  - Asian handicap markets
+  - Asian handicap markets (fixture_odds_table)
 
 ### Required Fields
 - **Pre-match data:**
