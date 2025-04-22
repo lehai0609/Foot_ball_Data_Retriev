@@ -1,0 +1,291 @@
+# Football Asian Handicap Prediction Model Masterplan
+
+## Project Overview & Objective
+
+This project aims to develop a machine learning model that predicts whether the pre-match favorite in a football match will cover specific Asian handicap spreads (-1, -1.5, +1, +1.5) based on half-time statistics and pre-match odds. The model will be used during half-time breaks to identify profitable in-play betting opportunities, with a focus on finding situations where favorites fail to cover their handicaps.
+
+## Problem Definition & Success Criteria
+
+### Prediction Goal
+- Predict whether the pre-match favorite (determined by lowest decimal odds) will cover specific Asian handicap values by the end of the match
+- Focus on handicap values: -1, -1.5, +1, +1.5
+- Make predictions at half-time using first-half statistics
+
+### Success Criteria
+- Positive Return on Investment (ROI) over extended periods
+- High yield percentage compared to baseline strategies
+- Win rate sufficient to maintain profitability with Kelly criterion staking
+
+## Data Requirements & Sources
+
+### Data Sources
+- Existing SportMonks Football API data pipeline (already implemented)
+- SQLite database with structured tables for:
+  - Fixture basic information (schedules table)
+  - Half-time statistics (fixture_stats table)
+  - Pre-match odds (fixture_odds table)
+  - Asian handicap markets
+
+### Required Fields
+- **Pre-match data:**
+  - Home/Draw/Away odds (to identify the favorite)
+  - Asian handicap lines and odds (-1, -1.5, +1, +1.5)
+  
+- **Half-time statistics:**
+  - Goals
+  - Shots (total, on target, blocked, inside box)
+  - Possession percentages
+  - Fouls, yellow/red cards, tackles, saves
+  - Successful passes and percentage
+  - Attacks, dangerous attacks
+  - Other intensity/momentum indicators
+
+- **Target variables:**
+  - Binary outcome: Did favorite cover the handicap? (Yes/No)
+
+## Data Preparation & Preprocessing
+
+### Data Extraction & Integration
+1. Create a specialized query or view in the SQLite database to join:
+   - Schedules table (for match details)
+   - First-half fixture_stats (for performance data)
+   - Pre-match fixture_odds (for identifying favorites and handicap values)
+   - Final match results (for determining handicap outcomes)
+
+2. Generate separate datasets for each handicap value (-1, -1.5, +1, +1.5)
+
+### Preprocessing Steps
+1. **Feature engineering:**
+   - Calculate half-time differentials between teams (e.g., shot differential, possession differential)
+   - Normalize statistics across leagues to account for different baseline rates
+   - Create categorical features for match situations (e.g., home team leading at half-time)
+   - Include odds-based features (e.g., implied probability differentials)
+
+2. **Data cleaning:**
+   - Handle missing values in half-time statistics
+   - Remove matches with insufficient data
+   - Address potential outliers in statistical measurements
+
+3. **Feature scaling:**
+   - Standardize or normalize features to improve model performance
+   - Consider scaling methods that preserve outliers for key statistics
+
+## Feature Engineering Approach
+
+### Core Features
+1. **Team performance differentials:**
+   - Favorite minus underdog for all key statistics
+   - Consider both absolute and percentage differences
+
+2. **Match context features:**
+   - Half-time score and goal differential
+   - Current match state relative to pre-match expectations (e.g., favorite underperforming)
+   - Home/away status of the favorite
+
+3. **Odds-derived features:**
+   - Pre-match odds ratios
+   - Implied probabilities
+   - Favorite strength indicator (based on odds gap)
+
+### Feature Selection Strategy
+1. Use XGBoost's built-in feature importance metrics to identify most predictive features
+2. Implement recursive feature elimination to optimize the feature set
+3. Evaluate correlation matrices to remove highly redundant features
+4. Consider different feature sets for different handicap values
+
+## Model Selection & Training
+
+### Primary Model
+**XGBoost Classification** with the following advantages:
+- Handles complex non-linear relationships between features
+- Performs well with tabular data
+- Built-in regularization to help prevent overfitting
+- Feature importance metrics for interpretability
+- Can output well-calibrated probability estimates
+
+### Alternative Models to Explore
+1. **LightGBM:**
+   - Faster training time
+   - Often performs well with categorical features
+   - May handle some data patterns differently than XGBoost
+
+2. **CatBoost:**
+   - Handles categorical variables automatically
+   - Often requires less tuning
+   - Potentially better probability calibration
+
+### Modeling Approach
+1. **Separate models for each handicap value:**
+   - Train dedicated models for -1, -1.5, +1, and +1.5 handicaps
+   - This allows for handicap-specific feature engineering and parameter tuning
+
+2. **Overfitting prevention:**
+   - Early stopping using validation performance
+   - Tree constraints (max_depth, min_child_weight)
+   - Regularization parameters (alpha, lambda)
+   - Appropriate subsample and colsample rates
+   - Learning rate (eta) optimization
+
+3. **Hyperparameter optimization:**
+   - Implement Bayesian optimization with cross-validation
+   - Focus on both prediction accuracy and calibration of probability estimates
+   - Optimize for profit-related metrics rather than just classification accuracy
+
+## Model Evaluation Strategy
+
+### Validation Approach
+1. **Temporal validation:**
+   - Split data chronologically to simulate real betting scenarios
+   - Ensure all training data precedes validation data
+
+2. **Walk-forward validation:**
+   - Train on rolling window of past data
+   - Validate on subsequent matches
+   - Slide window forward to generate multiple validation periods
+
+3. **League-based checks:**
+   - Verify consistent performance across different competitions
+   - Identify any league-specific biases in the model
+
+### Evaluation Metrics
+1. **Classification metrics:**
+   - Accuracy, precision, recall
+   - AUC-ROC and AUC-PR curves
+   - Log loss (for probability calibration)
+
+2. **Betting performance metrics:**
+   - ROI (Return on Investment)
+   - Yield percentage
+   - Kelly criterion expected value
+   - Sharpe ratio (risk-adjusted returns)
+
+3. **Confidence calibration:**
+   - Reliability diagrams
+   - Brier score
+   - Calibration curves
+
+## Betting Strategy Implementation
+
+### Bet Selection
+1. Build a system to identify value bets where:
+   - Model predicted probability > implied probability from odds
+   - Difference exceeds a configurable threshold (edge requirement)
+   - Model confidence meets minimum requirement
+
+### Stake Sizing
+1. Implement Kelly criterion for optimal bet sizing:
+   - Calculate fractional Kelly (e.g., half or quarter Kelly) to reduce variance
+   - Set maximum stake limits as percentage of bankroll
+   - Consider minimum edge requirements for each stake level
+
+### Risk Management
+1. **Diversification:**
+   - Limit exposure to any single league or match
+   - Set maximum number of concurrent bets
+
+2. **Performance monitoring:**
+   - Implement automatic circuit breakers if performance deteriorates
+   - Periodic model retraining and validation
+
+## Implementation Roadmap
+
+### Phase 1: Data Preparation & Exploratory Analysis (2-3 weeks)
+1. Create comprehensive dataset joining all required tables
+2. Perform exploratory data analysis to identify patterns
+3. Analyze historical distributions of favorites covering handicaps
+4. Build baseline statistical models
+
+### Phase 2: Feature Engineering & Initial Modeling (2-3 weeks)
+1. Implement feature engineering pipeline
+2. Train separate XGBoost models for each handicap value
+3. Conduct initial performance evaluation
+4. Identify most predictive features
+
+### Phase 3: Model Optimization & Validation (2-3 weeks)
+1. Fine-tune model hyperparameters
+2. Implement temporal validation strategy
+3. Test alternative models (LightGBM, CatBoost)
+4. Evaluate probability calibration
+
+### Phase 4: Betting Strategy Development (1-2 weeks)
+1. Implement value bet identification system
+2. Develop Kelly criterion calculator
+3. Create backtesting framework for betting strategy
+4. Simulate historical performance with various parameters
+
+### Phase 5: Deployment & Monitoring (Ongoing)
+1. Build system for generating half-time predictions
+2. Implement logging and performance tracking
+3. Develop dashboards for monitoring betting performance
+4. Set up automated alerts for model drift or performance issues
+
+## Technical Architecture
+
+### Data Pipeline
+- Continue using existing SportMonks API data pipeline
+- Add specialized ETL processes for half-time statistics
+
+### Model Serving
+- Simple SQLite-based implementation for individual use
+- Predictions generated at half-time via Python script
+
+### Technology Stack
+- Python for data processing and modeling
+- XGBoost and related libraries for model training
+- SQLite for data storage
+- Optional: Streamlit or Flask for simple dashboard/UI
+
+## Future Enhancements
+
+### Potential Extensions
+1. **Additional handicap values:**
+   - Expand to other common handicap lines (e.g., -0.5, -2.0, -2.5)
+
+2. **Enhanced features:**
+   - Incorporate team-specific historical covering rates
+   - Add derived features for momentum shifts during first half
+   - Consider text-based features from match reports or commentaries
+
+3. **Real-time capabilities:**
+   - Move beyond half-time to minute-by-minute predictions
+   - Implement streaming data pipeline for live odds movements
+
+4. **Portfolio optimization:**
+   - Develop multi-model betting approach 
+   - Implement correlated risk management across simultaneous bets
+
+## Monitoring & Maintenance
+
+### Performance Monitoring
+1. Track prediction accuracy and betting returns over time
+2. Monitor for changes in feature distributions
+3. Implement automated statistical tests for model drift
+
+### Retraining Strategy
+1. Full model retraining at the end of each season
+2. Incremental updates if performance degrades significantly 
+3. A/B testing of model versions for continuous improvement
+
+### Risk Mitigation
+1. Maintain separate development and production models
+2. Implement graceful degradation if data feeds are disrupted
+3. Set up alerts for unexpected prediction patterns
+
+## Ethical Considerations
+
+### Responsible Betting
+1. Focus on creating a sustainable, long-term profitable approach
+2. Avoid optimizing for exploitative patterns
+3. Consider implementing built-in limits and cooling-off periods
+
+### Data Privacy
+1. Ensure all data usage complies with terms of service
+2. Maintain appropriate security for any stored betting data
+
+## Conclusion
+
+This project leverages existing football data infrastructure to create a specialized in-play betting model focused on Asian handicap markets. By combining half-time statistics with pre-match odds, the model aims to identify value betting opportunities where favorites are likely to underperform against their handicap expectations.
+
+The implementation focuses on XGBoost and related boosting algorithms, with careful attention to overfitting prevention and proper validation techniques. The betting strategy incorporates Kelly criterion staking to optimize bankroll growth while managing risk.
+
+Success will be measured through genuine betting metrics (ROI, yield, win rate) rather than just model accuracy, with an emphasis on long-term profitability and sustainability.
