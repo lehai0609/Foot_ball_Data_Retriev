@@ -30,7 +30,7 @@ FIXTURE_LIMIT = 20 # <<< LIMIT FOR TESTING as requested
 # --- Helper Functions ---
 def get_finished_round_fixture_ids(conn, limit=None):
     """
-    Fetches fixture IDs from the schedules table where the round is marked as finished.
+    Fetches fixture IDs from the schedules table where the status is 'FT'.
     Optionally excludes fixtures already present in the fixture_stats table.
     Optionally limits the number of fixtures returned.
     """
@@ -38,19 +38,15 @@ def get_finished_round_fixture_ids(conn, limit=None):
     cursor = None
     try:
         cursor = conn.cursor()
-        # Select fixture_id from schedules where round_finished is true (1)
-        # AND the fixture_id does not already exist in fixture_stats table for the 'full_match' period (or any period)
-        # This prevents refetching stats for fixtures already processed.
-        # We check for existence of *any* stat row for that fixture_id.
+        # Updated query: Select fixture_id from schedules where status is 'FT'
+        # AND the fixture_id does not already exist in fixture_stats table
         query = """
             SELECT DISTINCT s.fixture_id
             FROM schedules s
             LEFT JOIN fixture_stats fs ON s.fixture_id = fs.fixture_id
-            WHERE s.round_finished = 1 AND fs.fixture_id IS NULL
+            WHERE s.status = 'FT' AND fs.fixture_id IS NULL
             ORDER BY s.fixture_id
         """
-        # Alternative: Fetch all finished and let INSERT OR IGNORE handle updates
-        # query = "SELECT fixture_id FROM schedules WHERE round_finished = 1 ORDER BY fixture_id"
 
         if limit:
             query += f" LIMIT {int(limit)}"
@@ -58,21 +54,22 @@ def get_finished_round_fixture_ids(conn, limit=None):
         cursor.execute(query)
         rows = cursor.fetchall()
         fixture_ids = [row['fixture_id'] for row in rows]
-        print(f"Found {len(fixture_ids)} unprocessed fixture IDs from finished rounds (limit applied: {limit}).")
+        print(f"Found {len(fixture_ids)} unprocessed fixture IDs with status 'FT' (limit applied: {limit}).")
 
     except sqlite3.Error as e:
         print(f"Error fetching fixture IDs from schedules table: {e}")
         if "no such table: schedules" in str(e):
             print("Error: 'schedules' table not found. Run sync_schedules.py first.")
         elif "no such table: fixture_stats" in str(e):
-             print("Info: 'fixture_stats' table not found (will be created), fetching all finished round fixtures.")
+             print("Info: 'fixture_stats' table not found (will be created), fetching all finished fixtures.")
              try:
-                 fallback_query = "SELECT fixture_id FROM schedules WHERE round_finished = 1 ORDER BY fixture_id"
+                 # Updated fallback query to use status = 'FT' instead of round_finished = 1
+                 fallback_query = "SELECT fixture_id FROM schedules WHERE status = 'FT' ORDER BY fixture_id"
                  if limit: fallback_query += f" LIMIT {int(limit)}"
                  cursor.execute(fallback_query)
                  rows = cursor.fetchall()
                  fixture_ids = [row['fixture_id'] for row in rows]
-                 print(f"Found {len(fixture_ids)} fixture IDs from finished rounds (fixture_stats table not present, limit: {limit}).")
+                 print(f"Found {len(fixture_ids)} fixture IDs with status 'FT' (fixture_stats table not present, limit: {limit}).")
              except sqlite3.Error as e2:
                  print(f"Error executing fallback query: {e2}")
     finally:
@@ -100,7 +97,7 @@ def save_raw_fixture_detail(data, fixture_id):
 # --- Main Workflow ---
 def main(limit=FIXTURE_LIMIT): # Accept limit as argument
     """Fetches details for finished fixtures, processes stats (long format), and stores them."""
-    print("=== Starting Fixture Statistics Sync Workflow (Long Format) ===")
+    print("=== Starting Fixture Statistics Sync Workflow for Completed Matches(Long Format) ===")
     stats_table_name = "fixture_stats"
     # stats_primary_key = "id" # Auto-increment ID is the PK for the trigger
 
