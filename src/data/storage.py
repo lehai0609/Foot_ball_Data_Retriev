@@ -239,32 +239,43 @@ def create_fixture_stats_table(conn):
 def create_fixture_odds_table(conn):
     """
     Creates the fixture_odds table to store pre-match odds.
-    Uses a UNIQUE constraint to prevent duplicate odds entries for the
-    same fixture, market, bookmaker, label, and handicap.
+    Includes all columns processed from the API.
+    Uses a UNIQUE constraint to prevent duplicate odds entries.
     """
     sql = """
     CREATE TABLE IF NOT EXISTS fixture_odds (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, -- Internal DB ID
-        fixture_id INTEGER NOT NULL,          -- Links to schedules.fixture_id
-        market_id INTEGER NOT NULL,           -- From SportMonks API 'market_id'
-        bookmaker_id INTEGER NOT NULL,        -- From SportMonks API 'bookmaker_id'
-        label TEXT NOT NULL,                  -- From SportMonks API 'label' (e.g., 'Home', 'Away', 'Over', 'Under')
-        name TEXT,                            -- From SportMonks API 'name' (e.g., 'Home', 'Away', 'Over 2.5')
-        market_description TEXT,              -- From SportMonks API 'market_description' (e.g., 'Match Result', 'Asian Handicap')
-        value REAL,                           -- From SportMonks API 'value' (e.g., 1.83, 2.5), converted to REAL
-        probability REAL,                     -- From SportMonks API 'probability' (e.g., 54.64), converted to REAL
-        handicap REAL,                        -- From SportMonks API 'handicap' (e.g., -0.25), converted to REAL
-        -- Timestamps
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        fixture_id INTEGER NOT NULL,
+        market_id INTEGER NOT NULL,
+        bookmaker_id INTEGER NOT NULL,
+        label TEXT NOT NULL,
+        name TEXT,
+        market_description TEXT,
+        value REAL,
+        probability REAL,
+        dp3 TEXT,                           -- Added: Store as TEXT
+        fractional TEXT,                    -- Added: Store as TEXT
+        american TEXT,                      -- Added: Store as TEXT
+        winning BOOLEAN,                    -- Added: Store as BOOLEAN (0/1)
+        stopped BOOLEAN,                    -- Added: Store as BOOLEAN (0/1)
+        total REAL,                         -- Added: Store as REAL
+        handicap REAL,
+        participants TEXT,                  -- Added: Store participants info (e.g., as JSON TEXT)
+        api_created_at TEXT,                -- Added: Store API timestamp as TEXT
+        original_label TEXT,                -- Added
+        latest_bookmaker_update TEXT,       -- Added: Store API timestamp as TEXT
+        -- Timestamps for DB tracking
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-        -- Constraints
-        UNIQUE (fixture_id, market_id, bookmaker_id, label, handicap) -- Prevent duplicates for the same specific odd
+        -- Constraints: Adjust UNIQUE constraint if needed, maybe 'total' or other fields
+        -- are part of the uniqueness for some markets (e.g., Over/Under)
+        UNIQUE (fixture_id, market_id, bookmaker_id, label, handicap, total) -- Adjusted UNIQUE constraint example
         -- Optional: Add FOREIGN KEY constraints later if needed
         -- FOREIGN KEY (fixture_id) REFERENCES schedules(fixture_id)
     );"""
     if create_table(conn, sql):
-        logging.info("Fixture_Odds table ensured.")
+        logging.info("Fixture_Odds table ensured (with all columns).")
     else:
         logging.error("Failed to ensure fixture_odds table.")
 # --- End of NEW function ---

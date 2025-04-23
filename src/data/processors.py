@@ -1,6 +1,7 @@
 # src/data/processors.py
 from datetime import datetime
 import logging
+import json # Needed for handling participants field
 
 # Configure basic logging if not done elsewhere
 # logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -14,6 +15,22 @@ def safe_convert(value, target_type, default=None):
         # Handle percentage strings for floats
         if target_type is float and isinstance(value, str) and '%' in value:
             return float(value.replace('%', '').strip())
+        # Handle boolean conversion (SQLite uses 0/1)
+        if target_type is bool:
+            if isinstance(value, bool):
+                return value
+            # Handle common string representations of boolean
+            if isinstance(value, str):
+                val_lower = value.lower()
+                if val_lower in ['true', '1', 'yes', 't']: return True
+                if val_lower in ['false', '0', 'no', 'f']: return False
+            # Handle integer representations
+            if isinstance(value, int):
+                if value == 1: return True
+                if value == 0: return False
+            # Fallback if conversion isn't obvious
+            return default
+        # General conversion
         return target_type(value)
     except (ValueError, TypeError):
         # logging.debug(f"Could not convert '{value}' ({type(value).__name__}) to {target_type.__name__}. Returning default.")
@@ -488,13 +505,18 @@ def process_fixture_stats_long(raw_fixture_data):
     return processed_rows
 
 
-# --- NEW: Pre-Match Odds Processor ---
+# --- UPDATED: Pre-Match Odds Processor ---
 def process_prematch_odds_data(raw_odds_data):
     """
     Processes the raw response from the /odds/pre-match/fixtures/{id} endpoint
-    into a list of dictionaries suitable for the fixture_odds table.
+    into a list of dictionaries suitable for the updated fixture_odds table.
+    Includes filtering for specific market_ids and bookmaker_ids.
     """
     processed_odds = []
+    # Define the allowed market and bookmaker IDs
+    ALLOWED_MARKET_IDS = {1}
+    ALLOWED_BOOKMAKER_IDS = {20}
+
     if not raw_odds_data or 'data' not in raw_odds_data:
         logging.warning("Invalid or empty odds data received for processing.")
         return processed_odds
@@ -505,39 +527,62 @@ def process_prematch_odds_data(raw_odds_data):
         logging.warning("Odds data is not a list as expected.")
         return processed_odds
 
+    filtered_count = 0
+    processed_count = 0
+
     for odd_item in odds_list:
         if not isinstance(odd_item, dict):
             logging.warning(f"Skipping invalid odd item (not a dict): {odd_item}")
             continue
 
-        # Extract required fields, performing safe type conversions
+        # Extract key IDs for filtering
         fixture_id = odd_item.get("fixture_id")
         market_id = odd_item.get("market_id")
         bookmaker_id = odd_item.get("bookmaker_id")
-        label = odd_item.get("label")
+        label = odd_item.get("label") # Needed for unique constraint
+
+        # --- Filtering Logic ---
+        if market_id not in ALLOWED_MARKET_IDS or bookmaker_id not in ALLOWED_BOOKMAKER_IDS:
+            filtered_count += 1
+            # logging.debug(f"Skipping odd due to market/bookmaker filter: Market={market_id}, Bookmaker={bookmaker_id}")
+            continue
+        # --- End Filtering Logic ---
 
         # Basic validation: need these keys for the unique constraint
         if not all([fixture_id, market_id, bookmaker_id, label]):
              logging.warning(f"Skipping odd item due to missing key fields (fixture_id, market_id, bookmaker_id, label): {odd_item}")
              continue
 
+        # Extract all requested fields, performing safe type conversions
         processed_item = {
             "fixture_id": fixture_id,
             "market_id": market_id,
             "bookmaker_id": bookmaker_id,
             "label": label,
-            "name": odd_item.get("name"), # Optional
-            "market_description": odd_item.get("market_description"), # Optional
             "value": safe_convert(odd_item.get("value"), float),
+            "name": odd_item.get("name"),
+            "market_description": odd_item.get("market_description"),
             "probability": safe_convert(odd_item.get("probability"), float), # Handles "54.64%"
-            "handicap": safe_convert(odd_item.get("handicap"), float) # Can be None, 0.0, -0.25 etc.
+            "dp3": odd_item.get("dp3"), # Store as TEXT
+            "fractional": odd_item.get("fractional"), # Store as TEXT
+            "american": odd_item.get("american"), # Store as TEXT
+            "winning": safe_convert(odd_item.get("winning"), bool), # Convert to BOOLEAN (0/1)
+            "stopped": safe_convert(odd_item.get("stopped"), bool), # Convert to BOOLEAN (0/1)
+            "total": safe_convert(odd_item.get("total"), float), # Convert to REAL
+            "handicap": safe_convert(odd_item.get("handicap"), float), # Can be None, 0.0, -0.25 etc.
+            # Store participants as JSON string if it's complex, otherwise as is
+            "participants": odd_item.get("participants"), # Let storage handle JSON dump
+            "api_created_at": odd_item.get("created_at"), # Store timestamp string
+            "original_label": odd_item.get("original_label"),
+            "latest_bookmaker_update": odd_item.get("latest_bookmaker_update") # Store timestamp string
         }
 
         processed_odds.append(processed_item)
+        processed_count += 1
 
-    logging.info(f"Processed {len(processed_odds)} pre-match odd entries.")
+    logging.info(f"Processed {processed_count} pre-match odd entries after filtering. Filtered out: {filtered_count}.")
     return processed_odds
-# --- End of NEW Processor ---
+# --- End of UPDATED Processor ---
 
 
 # --- Placeholder functions for future implementation ---
