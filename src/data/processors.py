@@ -514,7 +514,7 @@ def process_prematch_odds_data(raw_odds_data):
     """
     processed_odds = []
     # Define the allowed market and bookmaker IDs
-    ALLOWED_MARKET_IDS = {1, 269}
+    ALLOWED_MARKET_IDS = {1, 269, 6}
     ALLOWED_BOOKMAKER_IDS = {20, 29}
 
     if not raw_odds_data or 'data' not in raw_odds_data:
