@@ -23,9 +23,9 @@ from src.config import RAW_DATA_DIR # For saving raw data
 # --- Configuration ---
 FIXTURE_DETAILS_RAW_DIR = RAW_DATA_DIR / "fixture_details" # Directory for raw fixture detail responses
 FIXTURE_DETAILS_RAW_DIR.mkdir(parents=True, exist_ok=True)
-API_DELAY_SECONDS = 0.5 # Optional delay between API calls per fixture
+API_DELAY_SECONDS = 1.5 # Optional delay between API calls per fixture
 BATCH_SIZE = 100 # Process and store stats rows in batches (e.g., 100 rows)
-FIXTURE_LIMIT = 20 # <<< LIMIT FOR TESTING as requested
+FIXTURE_LIMIT = None # <<< LIMIT FOR TESTING as requested
 
 # --- Helper Functions ---
 def get_finished_round_fixture_ids(conn, limit=None):

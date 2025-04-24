@@ -26,9 +26,9 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # --- Configuration ---
 ODDS_RAW_DIR = RAW_DATA_DIR / "prematch_odds" # Directory for raw odds responses
 ODDS_RAW_DIR.mkdir(parents=True, exist_ok=True)
-API_DELAY_SECONDS = 0.6 # Be slightly more conservative for odds endpoints
+API_DELAY_SECONDS = 1.5 # Be slightly more conservative for odds endpoints
 BATCH_SIZE = 200 # Process and store odds rows in batches
-FIXTURE_LIMIT = 20 # Set to a number (e.g., 50) for testing, None to process all
+FIXTURE_LIMIT = None # Set to a number (e.g., 50) for testing, None to process all
 ODDS_TABLE_NAME = "fixture_odds"
 
 # --- Helper Functions ---
