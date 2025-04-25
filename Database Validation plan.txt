@@ -1,0 +1,222 @@
+
+This plan outlines systematic checks to ensure the completeness, accuracy, and consistency of your football database, with a specific focus on the `fixture_stats` table and its suitability for half-time modeling.
+
+**I. Foundational Coverage & Completeness**
+
+1. **Overall Fixture Ingestion:**
+    
+    - **Check:** Compare fixture counts in `schedules` against official league schedules/calendars per season.
+        
+    - **Goal:** Ensure all expected matches are present in the base table.
+        
+2. **Stats Record Availability:**
+    
+    - **Check:** Identify 'Finished' fixtures in `schedules` that lack _any_ corresponding entries in `fixture_stats`.
+        
+    - **Method:** SQL `LEFT JOIN`.
+        
+    - **Goal:** Verify successful stats retrieval for completed matches via `sync_fixture_stats.py`.
+        
+3. **Critical Period Coverage ('first_half'):**
+    
+    - **Check:** Identify fixtures present in `fixture_stats` but missing entries for `period = 'first_half'`.
+        
+    - **Method:** SQL `GROUP BY fixture_id` and check period presence.
+        
+    - **Goal:** Confirm availability of the essential input period for the half-time model.
+        
+4. **Team Coverage (per Period):**
+    
+    - **Check:** For `period = 'first_half'`, verify each `fixture_id` has exactly two distinct `team_id` entries.
+        
+    - **Method:** SQL `GROUP BY fixture_id HAVING COUNT(DISTINCT team_id) = 2` for the 'first_half' period.
+        
+    - **Goal:** Ensure stats exist for _both_ teams in the required half.
+        
+5. **Required Stats Column Completeness (NULL vs. Zero):**
+    
+    - **Check:** For 'first_half' entries passing #4, calculate the NULL percentage for _each mandatory model input column_ (e.g., `goals`, `shots_total`, `ball_possession`, `successful_passes_percentage`, etc., based on `Modelling Planning.txt`).
+        
+    - **Method:** SQL aggregation or Pandas analysis. Explicitly differentiate `NULL` (treat as missing/unreliable for mandatory inputs) from `0` (valid data).
+        
+    - **Goal:** Pinpoint unreliable stats, inform `IS NOT NULL` filters for modeling, understand true data availability.
+        
+6. **Home/Away Balance (Sanity Check):**
+    
+    - **Check:** Verify that most teams in `schedules` have a roughly equal number of home/away fixtures per season (excluding tournaments).
+        
+    - **Method:** SQL `GROUP BY team_id, season_id` and count home/away locations.
+        
+    - **Goal:** Basic sanity check on schedule data integrity.
+        
+
+**II. Technical Integrity & Schema Validation**
+
+7. **ID Consistency:**
+    
+    - **Check:** Verify `fixture_id`, `team_id` consistency across `schedules`, `fixture_stats`, `fixture_odds`. Ensure `fixture_stats.team_id` matches `schedules.home_team_id` or `schedules.away_team_id`.
+        
+    - **Method:** SQL `JOIN` operations.
+        
+    - **Goal:** Ensure correct data linking.
+        
+8. **Duplicate Entry Detection:**
+    
+    - **Check:** Look for duplicate rows in `fixture_stats` based on the unique key (`fixture_id`, `team_id`, `period`).
+        
+    - **Method:** SQL `GROUP BY` unique key columns `HAVING COUNT(*) > 1`.
+        
+    - **Goal:** Ensure primary key/unique constraint integrity.
+        
+9. **Schema Consistency:**
+    
+    - **Check:** Verify all expected columns from `src/data/storage.py` definitions are present in tables.
+        
+    - **Method:** `PRAGMA table_info(...)` or DataFrame inspection.
+        
+    - **Goal:** Detect schema drift or loading errors.
+        
+10. **Timestamp Validity:**
+    
+    - **Check:** Ensure `created_at`/`updated_at` timestamps are logical. Check relevance/consistency of `fixture_stats.timestamp`.
+        
+    - **Method:** SQL range/order checks.
+        
+    - **Goal:** Verify processing timestamps.
+        
+11. **Data Version Control:**
+    
+    - **Check:** Understand if/how the API provider handles post-match stat updates. Ensure your process captures the desired version (e.g., final confirmed stats).
+        
+    - **Method:** Review API docs, potentially compare fetches over time for the same fixture.
+        
+    - **Goal:** Avoid using preliminary or unconfirmed stats if final ones are needed.
+        
+
+**III. Statistical Validity & Consistency**
+
+12. **Reasonable Value Ranges & Outlier Detection:**
+    
+    - **Check:** Analyze distributions (min/max, mean, median, stddev, histograms) for numerical stats. Identify impossible values (e.g., possession > 100%) or extreme outliers.
+        
+    - **Method:** SQL aggregates, Pandas `describe()`, visualizations, Z-score analysis, IQR.
+        
+    - **Goal:** Detect errors, bugs, or anomalous events requiring investigation.
+        
+13. **Internal Statistical Consistency:**
+    
+    - **Check:** Verify logical relationships: `shots_total >= shots_on_target`, `goals <= shots_on_target`, possession sum ≈ 100%, etc.
+        
+    - **Method:** SQL `WHERE` clauses or Pandas filtering.
+        
+    - **Goal:** Catch logical contradictions within stats.
+        
+14. **Score Consistency (`fixture_stats` vs. `schedules`):**
+    
+    - **Check:** Aggregate `goals` from `fixture_stats` across periods vs. `home_score`/`away_score` in `schedules`.
+        
+    - **Method:** SQL aggregation and joins.
+        
+    - **Goal:** Ensure alignment between detailed stats and final results.
+        
+15. **Temporal Consistency (Half-time vs. Full-time):**
+    
+    - **Check:** Verify cumulative stats ('second_half' or aggregated full-time) are >= 'first_half' values.
+        
+    - **Method:** SQL comparison across periods.
+        
+    - **Goal:** Check logical progression. (Requires understanding API period definitions).
+        
+16. **Statistical Fingerprinting & Ratios:**
+    
+    - **Check:** Develop expected ranges/ratios for stats based on context (e.g., team strength, league norms). Flag fixtures falling significantly outside these patterns (e.g., unusual shots:corners ratio).
+        
+    - **Method:** Statistical analysis, comparison against historical averages.
+        
+    - **Goal:** Advanced anomaly detection beyond simple range checks.
+        
+
+**IV. Contextual Analysis (League, Time, Fixture Type)**
+
+17. **League/Competition Disparities:**
+    
+    - **Check:** Analyze completeness (#1-5) and distributions (#12) grouped by `league_id`. Create heatmaps of stat availability per league. Note expected differences (top leagues vs. lower tiers, cup vs. league).
+        
+    - **Method:** SQL/Pandas `GROUP BY league_id`, visualizations.
+        
+    - **Goal:** Understand data quality variations, potential biases, inform modeling strategies (e.g., league-specific models).
+        
+18. **Home/Away Data Bias:**
+    
+    - **Check:** Compare completeness rates and average stat values for home vs. away teams.
+        
+    - **Method:** SQL/Pandas grouping by team location.
+        
+    - **Goal:** Identify systemic collection bias.
+        
+19. **Temporal Trends & Patterns:**
+    
+    - **Check:** Analyze completeness and distributions over seasons, mid-season, day-of-week, kickoff times.
+        
+    - **Method:** Time-series analysis.
+        
+    - **Goal:** Identify changes in data quality, provider behavior, or external factors influencing stats.
+        
+20. **Fixture-Specific Scenario Analysis:**
+    
+    - **Check:** Examine data handling for edge cases: abandoned/postponed matches, neutral venues, high-profile fixtures, weather effects, behind-closed-doors matches.
+        
+    - **Method:** Filtering and potentially manual inspection.
+        
+    - **Goal:** Understand how non-standard situations impact data representation and quality.
+        
+
+**V. External & Advanced Validation**
+
+21. **Cross-Provider Validation (High-Value):**
+    
+    - **Check:** Compare key stats for a sample of fixtures against a reputable secondary source (official sites, Opta, Wyscout, etc.).
+        
+    - **Method:** Manual comparison or API integration.
+        
+    - **Goal:** Independent accuracy benchmark.
+        
+22. **Video Validation (Targeted):**
+    
+    - **Check:** For critical fixtures with highly anomalous stats identified in other checks, verify against match footage if possible.
+        
+    - **Method:** Manual review.
+        
+    - **Goal:** Definitive verification for high-stakes outliers.
+        
+23. **Timeline Consistency (If Applicable):**
+    
+    - **Check:** If/when timeline data is added, verify that aggregated timeline events match the summary stats in `fixture_stats`.
+        
+    - **Method:** Aggregation and comparison.
+        
+    - **Goal:** Ensure consistency between different levels of data granularity.
+        
+
+**VI. Documentation & Monitoring**
+
+24. **Missing Data Registry & Quality Score:**
+    
+    - **Action:** Document known gaps, unreliable stats/leagues. Optionally develop a fixture-level data quality score.
+        
+    - **Goal:** Inform modeling, track quality.
+        
+25. **Data Provenance & Error Patterns:**
+    
+    - **Action:** Track data source if possible. Document systematic errors discovered.
+        
+    - **Goal:** Aid diagnostics and future improvements.
+        
+26. **Automated Monitoring:**
+    
+    - **Action:** Schedule key checks (coverage, NULL rates, consistency) to run automatically post-sync. Alert on significant deviations.
+        
+    - **Goal:** Proactive quality control.
+        
+
+By implementing this plan, focusing initially on Sections I, II, and III for core data quality relevant to your model, you will build a deep understanding of your dataset's reliability and make informed decisions for your modeling process.
