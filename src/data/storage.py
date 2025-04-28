@@ -369,6 +369,36 @@ def store_data(conn, table_name, data_list, primary_key_column="id", use_insert_
             cursor.close()
 
 
+def create_fixture_timeline_table(conn):
+    """
+    Creates the fixture_timeline table to store minute-by-minute data,
+    including pressure index and potential future events.
+    """
+    sql = """
+    CREATE TABLE IF NOT EXISTS fixture_timeline (
+        timeline_id INTEGER PRIMARY KEY AUTOINCREMENT, -- Renamed primary key
+        fixture_id INTEGER NOT NULL,            -- Links to schedules.fixture_id
+        minute INTEGER NOT NULL,                -- Minute of the event/data point
+        participant_id INTEGER,                 -- Added: Participant ID for pressure/event
+        pressure_index REAL,                    -- Added: Pressure index value
+        event_type TEXT,                        -- e.g., 'pressure', 'goal', 'card'
+        api_event_id INTEGER,                   -- Added: Original ID from API pressure/event item
+        timestamp DATETIME,                     -- Placeholder for potential event timestamp
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Trigger can be added later
+
+        -- Constraint to prevent duplicate pressure entries for the same minute/participant
+        UNIQUE (fixture_id, minute, participant_id, event_type), -- Added UNIQUE constraint
+
+        FOREIGN KEY (fixture_id) REFERENCES schedules(fixture_id)
+        -- Optional: FOREIGN KEY (participant_id) REFERENCES teams(team_id)
+    );"""
+    # Assumes create_table is defined elsewhere in storage.py
+    if create_table(conn, sql):
+        logging.info("Fixture_Timeline table ensured (with pressure index fields).")
+    else:
+        logging.error("Failed to ensure fixture_timeline table.")
+
 # store_fixture_stats_long should work without changes,
 # as it dynamically gets columns from the input data.
 def store_fixture_stats_long(conn, stats_rows):

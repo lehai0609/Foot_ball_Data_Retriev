@@ -584,6 +584,85 @@ def process_prematch_odds_data(raw_odds_data):
     return processed_odds
 # --- End of UPDATED Processor ---
 
+# Assume safe_convert helper function exists:
+# def safe_convert(value, target_type, default=None): ...
+
+def process_pressure_data(raw_fixture_data_with_pressure):
+    """
+    Processes the raw response from the /fixtures/{id}?include=pressure endpoint
+    to extract pressure index data for the fixture_timeline table.
+
+    Args:
+        raw_fixture_data_with_pressure (dict): The raw JSON response dictionary.
+
+    Returns:
+        list: A list of dictionaries, each representing a row for the
+              fixture_timeline table with pressure data. Returns empty list on error
+              or if no pressure data is found.
+    """
+    processed_pressure_rows = []
+    if not raw_fixture_data_with_pressure or 'data' not in raw_fixture_data_with_pressure:
+        logging.warning("Invalid or empty fixture data received for pressure processing.")
+        return processed_pressure_rows
+
+    fixture_main_data = raw_fixture_data_with_pressure['data']
+    if not isinstance(fixture_main_data, dict):
+        logging.warning("Fixture data for pressure is not a dictionary.")
+        return processed_pressure_rows
+
+    fixture_id = fixture_main_data.get('id')
+    if not fixture_id:
+        logging.warning("Fixture data missing ID for pressure processing.")
+        return processed_pressure_rows
+
+    if 'pressure' not in fixture_main_data or not isinstance(fixture_main_data['pressure'], list):
+        # Use logging.info for expected cases like no data available
+        logging.info(f"No pressure data array found for fixture {fixture_id}.")
+        return processed_pressure_rows
+
+    pressure_list = fixture_main_data['pressure']
+    # Log the number found before processing
+    logging.info(f"Found {len(pressure_list)} pressure entries in API response for fixture {fixture_id}.")
+
+    for item in pressure_list:
+        if not isinstance(item, dict):
+            logging.warning(f"Skipping invalid pressure item (not a dict) in fixture {fixture_id}: {item}")
+            continue
+
+        minute = item.get('minute')
+        participant_id = item.get('participant_id')
+        pressure_value = item.get('pressure')
+        api_event_id = item.get('id') # Get the original ID from the pressure item
+
+        # Basic validation: need fixture_id, minute, participant_id, and pressure value
+        # Check for None explicitly as 0 is a valid value for minute/pressure
+        if not all([fixture_id, minute is not None, participant_id is not None, pressure_value is not None]):
+            logging.warning(f"Skipping pressure item due to missing required fields in fixture {fixture_id}: {item}")
+            continue
+
+        # Use safe_convert helper function (ensure it's defined in processors.py)
+        processed_row = {
+            "fixture_id": fixture_id,
+            "minute": safe_convert(minute, int),
+            "participant_id": safe_convert(participant_id, int),
+            "pressure_index": safe_convert(pressure_value, float),
+            "event_type": "pressure", # Specific event type for pressure data
+            "api_event_id": safe_convert(api_event_id, int), # Store the original ID
+            # Other timeline fields are set to None for pressure-specific rows
+            "timestamp": None,
+            # created_at/updated_at are handled by the DB
+        }
+
+        # Additional validation after conversion (check if conversion resulted in None)
+        if processed_row['minute'] is None or processed_row['participant_id'] is None or processed_row['pressure_index'] is None:
+             logging.warning(f"Skipping pressure item after conversion failed for key fields in fixture {fixture_id}: {item}")
+             continue
+
+        processed_pressure_rows.append(processed_row)
+
+    # Log the final count of successfully processed rows
+    logging.info(f"Processed {len(processed_pressure_rows)} valid pressure index rows for fixture {fixture_id}.")
+    return processed_pressure_rows
 
 # --- Placeholder functions for future implementation ---
 # def process_fixture_details(raw_fixture_data): ... # To update main fixtures table

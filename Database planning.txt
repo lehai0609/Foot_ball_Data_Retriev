@@ -196,37 +196,38 @@ The following tables are either implemented or planned:
     );
     ```
 
-**7. `fixture_timeline` Table (Planned - Not Yet Implemented)**
+**7. `fixture_timeline` Table (Planned - Revised for Pressure Index)**
 
-* **Purpose:** Stores minute-by-minute timeline data, potentially including events, ball coordinates, or pressure indices if available from the API.
-* **Populated by:** Future `scripts/sync_events.py` or similar (requires implementation)
-* **Schema (Planned):**
+* **Purpose:** Stores minute-by-minute timeline data, including events and pressure indices if available from the API. [cite: 40]
+* **Populated by:** Future `scripts/sync_events.py` and `scripts/sync_pressure.py` (requires implementation). [cite: 41]
+* **Schema (Planned - Revised):**
     ```sql
     CREATE TABLE IF NOT EXISTS fixture_timeline (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        fixture_id INTEGER NOT NULL,            -- Links to schedules.fixture_id
-        minute INTEGER NOT NULL,                -- Minute of the event/data point
-        second INTEGER,                         -- Optional: Second within the minute
-        event_type TEXT,                        -- e.g., 'goal', 'card', 'substitution', 'ball_position'
-        team_id INTEGER,                        -- Team associated with the event (if applicable)
-        player_id INTEGER,                      -- Player associated with the event (if applicable)
-        -- Potential Data Points (adjust based on available API data)
-        ball_x REAL,                            -- Ball x coordinate
-        ball_y REAL,                            -- Ball y coordinate
-        home_pressure_index REAL,               -- Example pressure index
-        away_pressure_index REAL,               -- Example pressure index
-        event_details TEXT,                     -- JSON or Text description of the event
-        timestamp DATETIME NOT NULL,            -- Timestamp of the event/data point
+        timeline_id INTEGER PRIMARY KEY AUTOINCREMENT, -- Renamed primary key
+        fixture_id INTEGER NOT NULL,            -- Links to schedules.fixture_id [cite: 41]
+        minute INTEGER NOT NULL,                -- Minute of the event/data point [cite: 41]
+        participant_id INTEGER,                 -- Added: Participant ID for pressure/event [cite: 42, 43]
+        pressure_index REAL,                    -- Added: Pressure index value [cite: 44, 45]
+        event_type TEXT,                        -- e.g., 'goal', 'card', 'substitution', 'ball_position', 'pressure' [cite: 42]
+        -- Other potential fields from original plan (can be added later)
+        -- second INTEGER,                      -- Optional: Second within the minute [cite: 42]
+        -- team_id INTEGER,                     -- Redundant if participant_id is used
+        -- player_id INTEGER,                   -- Player associated with the event (if applicable) [cite: 43]
+        -- ball_x REAL,                         -- Ball x coordinate [cite: 43, 44]
+        -- ball_y REAL,                         -- Ball y coordinate [cite: 44]
+        -- event_details TEXT,                  -- JSON or Text description of the event [cite: 45]
+        api_event_id INTEGER,                   -- Added: Original ID from API pressure/event item
+        timestamp DATETIME,                     -- Timestamp of the event/data point (when it occurred in match, if available) [cite: 45]
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        -- updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Trigger can be added later
-        FOREIGN KEY (fixture_id) REFERENCES schedules(fixture_id)
-        -- Optional: FOREIGN KEY (team_id) REFERENCES teams(team_id)
-        -- Optional: FOREIGN KEY (player_id) REFERENCES players(player_id) -- If players table exists
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Trigger can be added later
+
+        -- Constraint to prevent duplicate pressure entries for the same minute/participant
+        UNIQUE (fixture_id, minute, participant_id, event_type), -- Added UNIQUE constraint
+
+        FOREIGN KEY (fixture_id) REFERENCES schedules(fixture_id) [cite: 46]
+        -- Optional: FOREIGN KEY (participant_id) REFERENCES teams(team_id) -- If participant_id always refers to a team
     );
     ```
-
-**Note:** The `schedules` table serves as the central point for fixture information. `fixture_stats`, `fixture_odds`, and `fixture_timeline` link to it via `fixture_id`. Implementation for `fixture_odds` and `fixture_timeline` is planned for the future.
-
 ## Schema Usage for Prediction Modelling
 
 With the implemented schema, you can gather features for prediction models:
